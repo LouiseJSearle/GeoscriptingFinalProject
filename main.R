@@ -14,12 +14,8 @@
 
 packages <- c('downloader', 'raster', 'rgeos', 'stringr')
 lapply(packages, library, character.only=T)
-source('R/PhotoAnalysis.R')
-# from PhotoAnalysis import GetFOV
-# from PhotoAnalysis import PolygonFOV
-# from PhotoAnalysis import FeatureWidth
-# from PhotoAnalysis import Annotate
-# from VisibilityAnalysis import Visibility
+# source('R/PhotoAnalysis.R')
+# source('R/VisibilityAnalysis.R')
 
 
 ### Download data. 
