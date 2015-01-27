@@ -9,10 +9,14 @@
 ### Outputs:
 ###
 
+### Initial install of ExifTool, run in terminal:
+### cd GeoscriptingProjectLouiseSearle
+### chmod a+x ExiftoolBashScript.sh
+### ./ExiftoolBashScript.sh
 
 ### Load packages and modules.
 
-packages <- c('downloader', 'raster', 'rgeos', 'stringr')
+packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal')
 lapply(packages, library, character.only=T)
 # source('R/PhotoAnalysis.R')
 # source('R/VisibilityAnalysis.R')
@@ -40,11 +44,11 @@ unzip(zip_crowns, exdir = 'data/')
 ### Load data. Not complete!
 
 # Load tree crowns - store as SPolygonsDF.
-crowns <- CampusTreeCrowns.shp
+# crowns <- CampusTreeCrowns.shp
 # Load tree species - store as SPointsDF.
-species <- CampusBomenCobraFeb2012.shp
+# species <- CampusBomenCobraFeb2012.shp
 # Load features - store as SPolygonsDF.
-features <- TOP10NL_39O.gml
+# features <- TOP10NL_39O.gml
 
 
 ### Set known variables.
@@ -58,16 +62,16 @@ view_dist <- 1000 # I have chosen 1 km maximum visiblilty.
 ### Photograph Analysis
 
 # Retrieve exif data from photographs using ExifTool.
-photos_exif <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
-photos_exif <- gsub('"','', photos_exif)
+exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
+exif_data <- gsub('"','', exif_data)
 # Extract relevant data from exif strings with regular expression.
-photos_match <- str_match(photos_exif, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
+exif_match <- str_match(exif_data, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
 # Store data in a dataframe.
-photos.df <- data.frame('Name'=photos_match[,2], 'FocalLength'=as.double(photos_match[,3]), 'Direction'=as.integer(photos_match[,12]),
-                        'Latitude'=as.double(photos_match[,4])+(as.double(photos_match[,5])/60)+(as.double(photos_match[,6])/3600),  
-                        'Longitude'=as.double(photos_match[,8])+(as.double(photos_match[,9])/60)+(as.double(photos_match[,10])/3600))
-# Reproject coordinates from WGS to RD New. Not complete!
-
+exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
+                        'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
+                        'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
+# Create points, reprojecting coordinates from WGS to RD New.
+pnt1_xy <- cbind(photos.df, 51.9884)
 
 ### Create theoretical field of view
 
