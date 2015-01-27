@@ -9,7 +9,7 @@
 ### Outputs:
 ###
 
-### Initial install of ExifTool, run in terminal:
+### IMPORTANT! Initial install of ExifTool, run in terminal:
 ### cd GeoscriptingProjectLouiseSearle
 ### chmod a+x ExiftoolBashScript.sh
 ### ./ExiftoolBashScript.sh
