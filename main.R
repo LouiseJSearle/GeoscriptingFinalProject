@@ -79,65 +79,73 @@ species <- readOGR(species_file, layer=ogrListLayers(species_file))
 # Retrieve exif data from photographs using ExifTool.
 exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
 exif_data <- gsub('"','', exif_data)
-# Extract relevant data from exif strings with regular expression.
-exif_match <- str_match(exif_data, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
-# Store exif data in a dataframe.
-exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
+
+for(i in 1:length(exif_data){
+  # Extract relevant data from exif string with regular expression.
+  exif_match <- str_match(exif_data[i], "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
+  # Store exif data in a dataframe.
+  exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
                         'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
                         'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-# Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
-photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
-photo_origin <- spTransform(photo_pts, prj_RD)
+  # Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
+  photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+  photo_origin <- spTransform(photo_origin, prj_RD)
 
 ### Quick check all data.
 plot(crowns, col='green')
 plot(species, col='pink', add=T)
 plot(photo_origin, col='blue', add=T)
 
-### Create theoretical field of view
+### Create theoretical field of view.
 
-# Calculate points for FOV polygons. Make into complete FOV polygon function later!
+# Calculate points for FOV polygon. Make into complete FOV polygon function later!
 
 # Compute field of view angle, converting from radians to degrees.
 fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
 
-# Point 1 with data frame:
-points_fov <- data.frame('P1X'=photo_origin@coords[,1], 'P1Y'=photo_origin@coords[,2], 'P2X'=NA, 'P2Y'=NA, 'P3X' = NA, 'P3Y'=NA)
-# Point 2:
+### per photo:
+for(i in 1:length())
+# Point 1 coordinates with data frame:
+points_fov <- data.frame('Name' = photo_origin$Name, 'P1X'=photo_origin@coords[,1], 'P1Y'=photo_origin@coords[,2], 'P2X'=NA, 'P2Y'=NA, 'P3X' = NA, 'P3Y'=NA)
+# Point 2 coordinates added to data frame:
 trig_angle <- photo_origin$Direction-(fov_angle/2)
 trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
 for(i in 1:length(trig_func)){
   if(trig_func[i]==0){
     offset_x = sin(trig_angle[i]) * view_dist
     offset_y = sqrt((view_dist^2) - (offset_x^2))
-    points_fov[i,3] <- points_fov[i,1] + offset_x
-    points_fov[i,4] <- points_fov[i,2] + offset_y
+    points_fov[i,4] <- points_fov[i,2] + offset_x
+    points_fov[i,5] <- points_fov[i,3] + offset_y
   } 
   else{
     offset_y = cos(trig_angle[i]) * view_dist
     offset_x = sqrt((view_dist^2) - (offset_y^2))
-    points_fov[i,3] <- points_fov[i,1] + offset_x
-    points_fov[i,4] <- points_fov[i,2] + offset_y
+    points_fov[i,4] <- points_fov[i,2] + offset_x
+    points_fov[i,5] <- points_fov[i,3] + offset_y
   }
 }
-# Point 3:
+# Point 3 coordinates added to data frame:
 trig_angle <- photo_origin$Direction+(fov_angle/2) # The difference is the addition of half the fov_angle, rather than subtraction.
 trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
 for(i in 1:length(trig_func)){
   if(trig_func[i]==0){
     offset_x = sin(trig_angle[i]) * view_dist
     offset_y = sqrt((view_dist^2) - (offset_x^2))
-    points_fov[i,5] <- points_fov[i,1] + offset_x
-    points_fov[i,6] <- points_fov[i,2] + offset_y
+    points_fov[i,6] <- points_fov[i,2] + offset_x
+    points_fov[i,7] <- points_fov[i,3] + offset_y
   } 
   else{
     offset_y = cos(trig_angle[i]) * view_dist
     offset_x = sqrt((view_dist^2) - (offset_y^2))
-    points_fov[i,5] <- points_fov[i,1] + offset_x
-    points_fov[i,6] <- points_fov[i,2] + offset_y
+    points_fov[i,6] <- points_fov[i,2] + offset_x
+    points_fov[i,7] <- points_fov[i,3] + offset_y
   }
 }
 
+for(i in 1:length(trig_func){
+  polygon()
+  
+  
 # Create FOV polygons from points.
 #fov_polygon <- PolygonFOV(theo_fov)
 # Check FOV polygon.
