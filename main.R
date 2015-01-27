@@ -37,7 +37,7 @@ download.file(url_crowns, zip_crowns, mode='auto', quiet=T)
 unzip(zip_crowns, exdir = 'data/')
 
 
-### Load data.
+### Load data. Not complete!
 
 # Load tree crowns - store as SPolygonsDF.
 crowns <- CampusTreeCrowns.shp
@@ -51,6 +51,8 @@ features <- TOP10NL_39O.gml
 
 # Set camera CCD size.
 camera_ccd <- 4.54 # For iPhone 4s in this case.
+# Set camera view distance.
+view_dist <- 1000 # I have chosen 1 km maximum visiblilty.
 
 
 ### Photograph Analysis
@@ -64,14 +66,42 @@ photos_match <- str_match(photos_exif, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t
 photos.df <- data.frame('Name'=photos_match[,2], 'FocalLength'=as.double(photos_match[,3]), 'Direction'=as.integer(photos_match[,12]),
                         'Latitude'=as.double(photos_match[,4])+(as.double(photos_match[,5])/60)+(as.double(photos_match[,6])/3600),  
                         'Longitude'=as.double(photos_match[,8])+(as.double(photos_match[,9])/60)+(as.double(photos_match[,10])/3600))
-# Reproject coordinates from WGS to RD New.
+# Reproject coordinates from WGS to RD New. Not complete!
 
 
 ### Create theoretical field of view
 
 # Compute field of view angle, converting from radians to degrees.
 photos.df['FOVangle'] <- (2*atan(camera_ccd/(2*photos.df['FocalLength'])))*(180/pi)
-# Create FOV polygon.
+# Calculate points for FOV polygons. Make into complete FOV polygon function later!
+photos.df['Angle_2'] <- photo.df['Direction']-(photo.df[FOVangle]/2)
+photos.df['Angle_3'] <- photo.df['Direction']+(photo.df[FOVangle]/2)
+# Point 1:
+photos.df['Point1'] <- point from coords x and y
+# Point 2:
+if(photos.df['Angle2'] <= 45 | 135 <= photos.df['Angle2'] <= 225 | 315 <= photos.df['Angle2']){
+  offset_x = sin(photos.df['Angle2']) * view_dist
+  offset_y = sqrt((view_dist^2) - (offset_x^2))
+  photos.df['Point2'] <- point from coords x and y and offsets
+}
+else{
+  offset_y = cos(photos.df['Angle2']) * view_dist
+  offset_x = squareroot((view_dist^2) - (offset_y^2))
+  photos.df['Point2'] <- point from coords x and y and offsets
+}
+# Point 3:
+if(photos.df['Angle3'] <= 45 | 135 <= photos.df['Angle3'] <= 225 | 315 <= photos.df['Angle3']){
+  offset_x = sin(photos.df['Angle3']) * view_dist
+  offset_y = sqrt((view_dist^2) - (offset_x^2))
+  photos.df['Point3'] <- point from coords x and y and offsets
+  
+}
+else{
+  offset_y = cos(photos.df['Angle3']) * view_dist
+  offset_x = squareroot((view_dist^2) - (offset_y^2))
+  photos.df['Point3'] <- point from coords x and y and offsets
+}
+# Create FOV polygons from points.
 #fov_polygon <- PolygonFOV(theo_fov)
 # Check FOV polygon.
 #plot(fov_polygon)
