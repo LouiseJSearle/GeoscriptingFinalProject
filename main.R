@@ -24,6 +24,18 @@ lapply(packages, library, character.only=T)
 # source('R/VisibilityAnalysis.R')
 
 
+### Set known variables.
+
+# Camera CCD size.
+camera_ccd <- 4.54 # For iPhone 4s in this case.
+# Camera view distance.
+view_dist <- 1000 # I have chosen 1 km maximum visiblilty.
+# Projection WGS.
+prj_WGS <- CRS("+proj=longlat +datum=WGS84")
+# Projection RD New.
+prj_RD <- CRS("+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.2369,50.0087,465.658,-0.406857330322398,0.350732676542563,-1.8703473836068,4.0812 +units=m +no_defs")
+
+
 ### Download data. 
 
 # Download Top10NL dataset.
@@ -50,20 +62,20 @@ unzip(zip_photos, exdir = 'photographs/')
 
 ### Load data. Not complete!
 
-# Load tree crowns - store as SPolygonsDF.
-# crowns <- CampusTreeCrowns.shp
-# Load tree species - store as SPointsDF.
-# species <- CampusBomenCobraFeb2012.shp
-# Load features - store as SPolygonsDF.
-# features <- TOP10NL_39O.gml
-
-
-### Set known variables.
-
-# Set camera CCD size.
-camera_ccd <- 4.54 # For iPhone 4s in this case.
-# Set camera view distance.
-view_dist <- 1000 # I have chosen 1 km maximum visiblilty.
+# Load tree crowns.
+crowns_file <- 'data/CampusTreeCrowns.shp'
+crowns <- readOGR(crowns_file, layer=ogrListLayers(crowns_file))
+proj4string(crowns) = prj_RD
+# Check
+plot(crowns)
+# Load tree species.
+species_file <- 'data/CampusBomenCobraFeb2012.shp'
+species <- readOGR(species_file, layer=ogrListLayers(species_file))
+# Check
+plot(species, add=T)
+# Load features - store as SPolygonsDF. ADD LATER! Difficult.
+# features_file <- 'data/TOP10NL_39O.gml'
+# features <- readOGR(features_file, layer='Gebouw')
 
 
 ### Photograph Analysis
@@ -80,8 +92,9 @@ exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[
 # Check exif data
 exif.df
 # Create points, reprojecting coordinates from WGS to RD New.
-pnt1_xy <- cbind(photos.df, 51.9884)
-
+point1_coords <- cbind(exif.df['Longitude'], exif.df['Latitude'])
+mypoints <- SpatialPoints(point1_coords, proj4string=prj_WGS)
+mypointsRD <- spTransform(mypoints, prj_RD)
 ### Create theoretical field of view
 
 # Compute field of view angle, converting from radians to degrees.
