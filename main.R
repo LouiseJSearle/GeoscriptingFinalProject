@@ -9,7 +9,9 @@
 ### Outputs:
 ###
 
-### IMPORTANT! Initial install of ExifTool, run in terminal:
+### IMPORTANT! Initial install of ExifTool.
+### First change user name in path in ExiftoolBashScript.sh.
+### Then run in terminal:
 ### cd GeoscriptingProjectLouiseSearle
 ### chmod a+x ExiftoolBashScript.sh
 ### ./ExiftoolBashScript.sh
