@@ -85,20 +85,19 @@ exif_match <- str_match(exif_data, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-
 exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
                         'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
                         'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-# Create photo orgin points, reprojecting coordinates from WGS to RD New.
-point1_coords <- cbind(exif.df['Longitude'], exif.df['Latitude'])
-mypoints <- SpatialPoints(point1_coords, proj4string=prj_WGS)
-mypointsRD <- spTransform(mypoints, prj_RD)
+# Create photo spatial point data frame, and reprojecting coordinates from WGS to RD New.
+photo_pts <- SpatialPointsDataFrame(exif.df, coords=cbind(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+photo_pts <- spTransform(photo_pts, prj_RD)
 
 ### Quick check all data.
 plot(crowns, col='green')
 plot(species, col='pink', add=T)
-plot(mypointsRD, col='blue', add=T)
+plot(photo_pts, col='blue', add=T)
 
 ### Create theoretical field of view
 
 # Compute field of view angle, converting from radians to degrees.
-photos.df['FOVangle'] <- (2*atan(camera_ccd/(2*photos.df['FocalLength'])))*(180/pi)
+exif.df['FOVangle'] <- (2*atan(camera_ccd/(2*exif.df['FocalLength'])))*(180/pi)
 # Calculate points for FOV polygons. Make into complete FOV polygon function later!
 photos.df['Angle_2'] <- photo.df['Direction']-(photo.df[FOVangle]/2)
 photos.df['Angle_3'] <- photo.df['Direction']+(photo.df[FOVangle]/2)
