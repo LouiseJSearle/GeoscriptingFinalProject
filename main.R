@@ -41,6 +41,11 @@ url_crowns <- 'http://help.geodesk.nl/download_attachment.php?att_id=393&track=J
 zip_crowns <- 'downloads/TreeCrowns.zip'
 download.file(url_crowns, zip_crowns, mode='auto', quiet=T)
 unzip(zip_crowns, exdir = 'data/')
+# Download photo sample data.
+url_photos <- 'https://www.dropbox.com/s/02cwfz0na0cnbm1/CampusPhotos.zip?dl=0'
+zip_photos <- 'downloads/CampusPhotos.zip'
+download(url_photos, zip_photos, mode='wb', quiet=T)
+unzip(zip_photos, exdir = 'photographs/')
 
 
 ### Load data. Not complete!
@@ -72,6 +77,8 @@ exif_match <- str_match(exif_data, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-
 exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
                         'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
                         'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
+# Check exif data
+exif.df
 # Create points, reprojecting coordinates from WGS to RD New.
 pnt1_xy <- cbind(photos.df, 51.9884)
 
