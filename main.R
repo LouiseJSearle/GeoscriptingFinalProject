@@ -81,51 +81,63 @@ exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLong
 exif_data <- gsub('"','', exif_data)
 # Extract relevant data from exif strings with regular expression.
 exif_match <- str_match(exif_data, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
-# Store data in a dataframe.
+# Store exif data in a dataframe.
 exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
                         'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
                         'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-# Create photo spatial point data frame, and reprojecting coordinates from WGS to RD New.
-photo_pts <- SpatialPointsDataFrame(exif.df, coords=cbind(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
-photo_pts <- spTransform(photo_pts, prj_RD)
+# Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
+photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+photo_origin <- spTransform(photo_pts, prj_RD)
 
 ### Quick check all data.
 plot(crowns, col='green')
 plot(species, col='pink', add=T)
-plot(photo_pts, col='blue', add=T)
+plot(photo_origin, col='blue', add=T)
 
 ### Create theoretical field of view
 
-# Compute field of view angle, converting from radians to degrees.
-exif.df['FOVangle'] <- (2*atan(camera_ccd/(2*exif.df['FocalLength'])))*(180/pi)
 # Calculate points for FOV polygons. Make into complete FOV polygon function later!
-photos.df['Angle_2'] <- photo.df['Direction']-(photo.df[FOVangle]/2)
-photos.df['Angle_3'] <- photo.df['Direction']+(photo.df[FOVangle]/2)
-# Point 1:
-photos.df['Point1'] <- point from coords x and y
+
+# Compute field of view angle, converting from radians to degrees.
+fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
+
+# Point 1 with data frame:
+points_fov <- data.frame('P1X'=photo_origin@coords[,1], 'P1Y'=photo_origin@coords[,2], 'P2X'=NA, 'P2Y'=NA, 'P3X' = NA, 'P3Y'=NA)
 # Point 2:
-if(photos.df['Angle2'] <= 45 | 135 <= photos.df['Angle2'] <= 225 | 315 <= photos.df['Angle2']){
-  offset_x = sin(photos.df['Angle2']) * view_dist
-  offset_y = sqrt((view_dist^2) - (offset_x^2))
-  photos.df['Point2'] <- point from coords x and y and offsets
-}
-else{
-  offset_y = cos(photos.df['Angle2']) * view_dist
-  offset_x = squareroot((view_dist^2) - (offset_y^2))
-  photos.df['Point2'] <- point from coords x and y and offsets
+trig_angle <- photo_origin$Direction-(fov_angle/2)
+trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
+for(i in 1:length(trig_func)){
+  if(trig_func[i]==0){
+    offset_x = sin(trig_angle[i]) * view_dist
+    offset_y = sqrt((view_dist^2) - (offset_x^2))
+    points_fov[i,3] <- points_fov[i,1] + offset_x
+    points_fov[i,4] <- points_fov[i,2] + offset_y
+  } 
+  else{
+    offset_y = cos(trig_angle[i]) * view_dist
+    offset_x = sqrt((view_dist^2) - (offset_y^2))
+    points_fov[i,3] <- points_fov[i,1] + offset_x
+    points_fov[i,4] <- points_fov[i,2] + offset_y
+  }
 }
 # Point 3:
-if(photos.df['Angle3'] <= 45 | 135 <= photos.df['Angle3'] <= 225 | 315 <= photos.df['Angle3']){
-  offset_x = sin(photos.df['Angle3']) * view_dist
-  offset_y = sqrt((view_dist^2) - (offset_x^2))
-  photos.df['Point3'] <- point from coords x and y and offsets
-  
+trig_angle <- photo_origin$Direction+(fov_angle/2) # The difference is the addition of half the fov_angle, rather than subtraction.
+trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
+for(i in 1:length(trig_func)){
+  if(trig_func[i]==0){
+    offset_x = sin(trig_angle[i]) * view_dist
+    offset_y = sqrt((view_dist^2) - (offset_x^2))
+    points_fov[i,5] <- points_fov[i,1] + offset_x
+    points_fov[i,6] <- points_fov[i,2] + offset_y
+  } 
+  else{
+    offset_y = cos(trig_angle[i]) * view_dist
+    offset_x = sqrt((view_dist^2) - (offset_y^2))
+    points_fov[i,5] <- points_fov[i,1] + offset_x
+    points_fov[i,6] <- points_fov[i,2] + offset_y
+  }
 }
-else{
-  offset_y = cos(photos.df['Angle3']) * view_dist
-  offset_x = squareroot((view_dist^2) - (offset_y^2))
-  photos.df['Point3'] <- point from coords x and y and offsets
-}
+
 # Create FOV polygons from points.
 #fov_polygon <- PolygonFOV(theo_fov)
 # Check FOV polygon.
