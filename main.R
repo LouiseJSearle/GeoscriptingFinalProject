@@ -136,15 +136,8 @@ plot(photo_origin, col='red', add=T)
 plot(crowns_inter, col='darkgreen', add=T)
 plot(fov_polygon, add=T)
 box()
-mtext(side=3, paste("Trees in Field of View of Photograph: ", photo_origin$Name), cex=1.1, line=1, adj=0)
+mtext(side=3, paste("Trees in Field of View for Photograph: ", photo_origin$Name), cex=1.1, line=1, adj=0)
 text(photo_origin@coords, labels=as.character('Camera position'), cex=1.1, font=2, pos=2, offset=0.8)
 
-# Plot
-# plot(fov_polygon)
-# plot(photo_origin, col='magenta', add=T)
-# plot(crowns, col='green', add=T)
-# plot(crowns_inter, col='seagreen', add=T)
-# plot(species, col='red', cex=1.5, add=T)
-# plot(fov_polygon, add=T)
-# 
-# spplot(crowns_species, zcol='proportion')
+# Plot proportional visibility of tree crowns.
+spplot(crowns_species, zcol='proportion', main=paste('Proportional Visibility of Tree Crowns for Photograph: ', photo_origin$Name))
