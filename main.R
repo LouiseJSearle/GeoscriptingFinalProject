@@ -12,9 +12,9 @@
 # Step 0 # Install Exiftool package.
 
 ### IMPORTANT! Before running this R script, use Bash script to install Exiftool.
-### First change user name path at beginning of ExiftoolBashScript.sh.
+### First change path at beginning of ExiftoolBashScript.sh to match location of project directory.
 ### Then run in terminal:
-### cd GeoscriptingProjectLouiseSearle
+### cd # Location of project
 ### chmod a+x ExiftoolBashScript.sh
 ### ./ExiftoolBashScript.sh
 
