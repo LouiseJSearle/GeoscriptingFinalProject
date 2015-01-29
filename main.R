@@ -25,6 +25,7 @@
 packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
 source('FieldOfViewModule.R')
+source('VisibilityModule.R')
 
 
 # Step 2 # Download data. 
@@ -75,9 +76,11 @@ species <- spTransform(species, prj_RD)
 # Retrieve exif data from photographs using ExifTool. 
 exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
 exif_data <- gsub('"','', exif_data)
+
 ##############################################################################################################################################################################################################
 test <- exif_data[1]
 ##############################################################################################################################################################################################################
+
 # Extract relevant data from exif string with regular expression. FUNCTION! extract fov exif data.
 exif_match <- str_match(test, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
 # Store exif data in a dataframe.
@@ -99,26 +102,12 @@ points_fov <- PointsFOV(photo_origin, camera_ccd, max_dist)
 # Create FOV polygon from points.
 fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
 
-# Step 6 # Intersect landscape features with FOV polygon.
+# Step 6 # Visiblity analysis of tree crowns.
 
-# Intersect tree crowns with FOV, storing as SpatialLinesDataFrame.
+# Intersect tree crowns in field of view.
 crowns_inter <- gIntersection(crowns, fov_polygon, byid=T)
-crowns_df <- data.frame('ID' = c(1:length(crowns_inter)))
-crowns_inter <- SpatialPolygonsDataFrame(crowns_inter, data=crowns_df, match.ID=F)
-crowns_borders <- as(crowns_inter, "SpatialLinesDataFrame")
-# Create raster of tree crowns, cell values: 1 or NA.
-ext <- extent(crowns_borders)
-ext_rast <- raster(ncol=xmax(ext)-xmin(ext), nrow=ymax(ext)-ymin(ext), crs=prj_RD) 
-extent(ext_rast) <- ext
-crowns_raster <- rasterize(crowns_borders, ext_rast, field=1, background=0)
-# Convert raster to spatial points to extract coordinates, and assign to layers in raster.
-crowns_points <- rasterToPoints(crowns_raster, spatial=T)
-crowns_coords <- rasterize(crowns_points, ext_rast, field=crowns_points@coords, background=NA)
-crowns_raster$targetX <- crowns_coords@data@values[,1]
-crowns_raster$targetY <- crowns_coords@data@values[,2]
-crowns_raster$originX <- photo_origin@coords[,1]
-crowns_raster$originY <- photo_origin@coords[,2]
-
+# Store intersected crowns as raster layer, with stored coordinates of cells and camera position.
+crowns_raster <- TreesFOV(crowns_inter, photo_origin)
 
 # Step 7 # Visiblity analysis of tree crowns.
 
