@@ -4,10 +4,10 @@
 #!/bin/sh
 echo 'Install ExifTool script'
 echo 'Creating project directories'
-mkdir -p /Users/Louise/GeoscriptingProjectLouiseSearle/{downloads,data,results}
+mkdir -p /Users/Louise/Desktop/GeoscriptingFinalProject/{downloads,data,results}
 echo 'Complete'
 echo 'Downloading ExifTool package'
-cd /Users/Louise/GeoscriptingProjectLouiseSearle/downloads
+cd /Users/Louise/Desktop/GeoscriptingFinalProject/downloads
 sudo curl -O 'http://www.sno.phy.queensu.ca/~phil/exiftool/Image-ExifTool-9.82.tar.gz'
 echo 'Complete'
 echo 'Unpacking ExifTool package'
