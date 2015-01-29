@@ -43,7 +43,7 @@ PointsPosFOV <- function(photo, fov, distance){
   }
   return(points)
 }
-  
+
 PolygonFOV <- function(origin, points, project, view_min, view_max){
   coords_matrix = matrix(c(points[,2], points[,4], points[,6], points[,3], points[,5], points[,7]), nrow=3, ncol=2, byrow=F)
   poly <- Polygon(coords_matrix)
@@ -53,6 +53,6 @@ PolygonFOV <- function(origin, points, project, view_min, view_max){
   max_buffer <- buffer(origin, width=view_max)
   min_buffer <- buffer(origin, width=view_min)
   fov_max <- gIntersection(fov_polygon, max_buffer, byid=T)
-  fov_min <- gDifference(fov_distance, min_buffer, byid=T, )
+  fov_min <- gDifference(fov_max, min_buffer, byid=T, )
   return(fov_min)
 } 

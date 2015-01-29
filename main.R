@@ -24,9 +24,9 @@
 
 packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
-source('PhotographModule.R')
-source('FieldOfViewModule.R')
-source('VisibilityModule.R')
+source('R/PhotographModule.R')
+source('R/FieldOfViewModule.R')
+source('R/VisibilityModule.R')
 
 
 # Step 2 # Download data. 
@@ -71,7 +71,7 @@ species <- spTransform(species, prj_RD)
 
 # Step 4 # Get photograph metadata.
 
-# Retrieve exif data from photograph.
+# Retrieve exif data from selected photograph.
 photo_list <- list.files('photographs/')
 for(i in 1:length(photo_list)){
   if(photo_list[i] == photo_selection){
@@ -129,15 +129,17 @@ vis_trees_df <- data.frame('Species' = crowns_species$species[crowns_species$Vis
 
 # Step 8 # Visualisation and results.
 
-# # Plot field of view tree crowns.
-# plot(fov_polygon)
-# plot(crowns, col='green', add=T)
-# plot(photo_origin, col='red', add=T)
-# plot(crowns_inter, col='darkgreen', add=T)
-# plot(fov_polygon, add=T)
-# bbox(add=T)
-# 
-# # Plot
+# Plot field of view tree crowns.
+plot(fov_polygon)
+plot(crowns, col='green', add=T)
+plot(photo_origin, col='red', add=T)
+plot(crowns_inter, col='darkgreen', add=T)
+plot(fov_polygon, add=T)
+box()
+mtext(side=3, paste("Trees in Field of View of Photograph: ", photo_origin$Name), cex=1.1, line=1, adj=0)
+text(photo_origin@coords, labels=as.character('Camera position'), cex=1.1, font=2, pos=2, offset=0.8)
+
+# Plot
 # plot(fov_polygon)
 # plot(photo_origin, col='magenta', add=T)
 # plot(crowns, col='green', add=T)
@@ -146,26 +148,3 @@ vis_trees_df <- data.frame('Species' = crowns_species$species[crowns_species$Vis
 # plot(fov_polygon, add=T)
 # 
 # spplot(crowns_species, zcol='proportion')
-
-# Visualisation
-
-# spplot(crowns_inter, zcol='proportion')
-# perc_plot <- barplot(crowns_inter$proportion,col=rainbow(5),beside=F)
-
-# crownsWGS <- spTransform(crowns_inter, prj_WGS)
-# crowns_inter@data$id <- rownames(crowns_inter@data)
-# crownsGGstr <- fortify(crowns_inter, region = 'id')
-# crownsGGmerge <- merge(crownsGGstr, crowns_inter@data, by = "id")
-# head(crownsGGmerge)
-# bounding <- bbox(crownsWGS)
-# campus_map <- ggmap(get_map(location = bounding, maptype = "satellite", zoom = 6))
-# crownsGGplot <- ggplot(data = crownsGGmerge, aes(x=long, y=lat, group = group,
-#                                               fill = species)) +
-#   geom_polygon()  +
-#   geom_path(color = "white") +
-#   scale_fill_hue(l = 40) +
-#   coord_equal() +
-#   theme(legend.position = 'right', title = 'trees',
-#         axis.text = element_blank())
-# 
-# print(crownsGGplot)
