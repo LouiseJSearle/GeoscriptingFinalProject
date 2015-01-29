@@ -1,30 +1,33 @@
 ### Louise Searle, January 29 2015
 ### Geoscripting Project : Estimating Tree Species Count and Visibility in Photographs using Viewshed Analysis.
+###
 ### Objective:
 ### To estimate the number of trees featuring in a photograph, along with their species and degree of visibility. 
 ### Given the photograph metadata including GPS location and direction, a spatial field of view will be calculated. 
 ### Within this extent, the whether a tree feature is visible or not will be determined using a visability algorithm applied to a surface elevation dataset. 
-### Input data: 
 ###
-### Outputs:
+### Input data: One or more geo-located photographs. 
+### Outputs: 
 
 
-### IMPORTANT! Before running program, use Bash script to install ExifTool.
-### First change user name in path in ExiftoolBashScript.sh.
+# Step 0 # Install Exiftool package.
+
+### IMPORTANT! Before running this R script, use Bash script to install Exiftool.
+### First change user name path at beginning of ExiftoolBashScript.sh.
 ### Then run in terminal:
 ### cd GeoscriptingProjectLouiseSearle
 ### chmod a+x ExiftoolBashScript.sh
 ### ./ExiftoolBashScript.sh
 
 
-# Step1 # Load packages and modules.
+# Step 1 # Load packages and modules.
 
 packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
 source('VisRasterTest.R')
 
 
-# Step2 # Download data. 
+# Step 2 # Download data. 
 
 # Download tree species dataset.
 url_species <- 'http://help.geodesk.nl/download_attachment.php?att_id=400&track=JWH-4VP-G41D&e=louise.searle%40wur.nl'
@@ -78,11 +81,11 @@ test <- exif_data[1]
 # Extract relevant data from exif string with regular expression. FUNCTION! extract fov exif data.
 exif_match <- str_match(test, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
 # Store exif data in a dataframe.
-exif.df <- data.frame('Name'=exif_match[,2], 
-                      'FocalLength'=as.double(exif_match[,3]), 
-                      'Direction'=as.integer(exif_match[,12]),
-                      'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
-                      'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
+exif.df <- data.frame('Name' = exif_match[,2], 
+                      'FocalLength' = as.double(exif_match[,3]), 
+                      'Direction' = as.integer(exif_match[,12]),
+                      'Latitude' = as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
+                      'Longitude' = as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
 # Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
 photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
 photo_origin <- spTransform(photo_origin, prj_RD)
@@ -94,12 +97,22 @@ photo_origin <- spTransform(photo_origin, prj_RD)
 # Compute field of view angle, converting from radians to degrees.
 fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
 # Point 1 coordinates with data frame:
-points_fov <- data.frame('Name' = photo_origin$Name, 'P1X'=photo_origin@coords[,1], 'P1Y'=photo_origin@coords[,2], 'P2X'=NA, 'P2Y'=NA, 'P3X' = NA, 'P3Y'=NA)
+points_fov <- data.frame('Name' = photo_origin$Name, 
+                         'P1X' = photo_origin@coords[,1], 
+                         'P1Y' = photo_origin@coords[,2], 
+                         'P2X' = NA, 
+                         'P2Y' = NA, 
+                         'P3X' = NA, 
+                         'P3Y' = NA)
 # Point 2 coordinates added to data frame: FUNCTION!
 trig_angle <- photo_origin$Direction-(fov_angle/2)
-trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
+trig_func <- ifelse(trig_angle<45, 1, 
+                    ifelse(trig_angle<135, 0, 
+                           ifelse(trig_angle<225, 1, 
+                                  ifelse(trig_angle<315, 0, 1))))
 trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-trig_diry <- ifelse(trig_angle<90, 1, ifelse(trig_angle<270, 0, 1))
+trig_diry <- ifelse(trig_angle<90, 1, 
+                    ifelse(trig_angle<270, 0, 1))
 if(trig_dirx==1){
     offset_x = abs(sin(trig_angle) * (view_dist+50))
     points_fov[,4] <- points_fov[,2] + offset_x
@@ -117,10 +130,14 @@ if(trig_diry==0){
     points_fov[,5] <- points_fov[,3] + offset_y
 }
 # Point 3 coordinates added to data frame:
-trig_angle <- photo_origin$Direction+(fov_angle/2) # The difference is the addition of half the fov_angle, rather than subtraction.
-trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
+trig_angle <- photo_origin$Direction+(fov_angle/2)
+trig_func <- ifelse(trig_angle<45, 1, 
+                    ifelse(trig_angle<135, 0, 
+                           ifelse(trig_angle<225, 1, 
+                                  ifelse(trig_angle<315, 0, 1))))
 trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-trig_diry <- ifelse(trig_angle<90, 1, ifelse(trig_angle<270, 0, 1))
+trig_diry <- ifelse(trig_angle<90, 1, 
+                    ifelse(trig_angle<270, 0, 1))
 if(trig_dirx==1){
     offset_x = abs(sin(trig_angle) * (view_dist+50))
     points_fov[,6] <- points_fov[,2] + offset_x
@@ -205,7 +222,8 @@ for(i in 1:length(crowns_inter)){
   if((length(tree_int) > 0) & (crowns_inter$sum[i] > 0)){
     tree_coords <- coordinates(tree_int)
     for(j in 1:length(species)){
-      if((as.integer(species@coords[j, 1]) == as.integer(tree_coords[1,1])) & (as.integer(species@coords[j, 2]) == as.integer(tree_coords[1,2]))) crowns_inter$species[i] <- as.character(species$Boomsoort[j])
+      if((as.integer(species@coords[j, 1]) == as.integer(tree_coords[1,1])) & (as.integer(species@coords[j, 2]) == as.integer(tree_coords[1,2]))) 
+        crowns_inter$species[i] <- as.character(species$Boomsoort[j])
     } 
   } else{
     crowns_inter$species[i] <- 'Not available'
@@ -216,7 +234,9 @@ for(i in 1:length(crowns_inter)){
 
 # Store species and number of visible pixels for visible trees in data frame.
 crowns_inter$proportion = (crowns_inter$sum/sum(crowns_inter$sum))*100
-vis_trees_df <- data.frame(Species= crowns_inter$species[crowns_inter$sum > 0], Visibility = crowns_inter$sum[crowns_inter$sum > 0], Proportion = crowns_inter$proportion[crowns_inter$sum > 0])
+vis_trees_df <- data.frame(Species= crowns_inter$species[crowns_inter$sum > 0], 
+                           Visibility = crowns_inter$sum[crowns_inter$sum > 0], 
+                           Proportion = crowns_inter$proportion[crowns_inter$sum > 0])
 print(vis_trees_df)
 
 
