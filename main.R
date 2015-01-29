@@ -7,167 +7,264 @@
 ### Input data: 
 ###
 ### Outputs:
-###
 
-### IMPORTANT! Initial install of ExifTool.
+
+### IMPORTANT! Before running program, use Bash script to install ExifTool.
 ### First change user name in path in ExiftoolBashScript.sh.
 ### Then run in terminal:
 ### cd GeoscriptingProjectLouiseSearle
 ### chmod a+x ExiftoolBashScript.sh
 ### ./ExiftoolBashScript.sh
 
-### Load packages and modules.
 
-packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal')
+# Step1 # Load packages and modules.
+
+packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
-# source('R/PhotoAnalysis.R')
-# source('R/VisibilityAnalysis.R')
+source('VisRasterTest.R')
 
 
-### Set known variables.
+# Step2 # Download data. 
 
-# Camera CCD size.
-camera_ccd <- 4.54 # For iPhone 4s in this case.
-# Camera view distance.
-view_dist <- 1000 # I have chosen 1 km maximum visiblilty.
-# Projection WGS.
-prj_WGS <- CRS("+proj=longlat +datum=WGS84")
-# Projection RD New.
-prj_RD <- CRS("+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.2369,50.0087,465.658,-0.406857330322398,0.350732676542563,-1.8703473836068,4.0812 +units=m +no_defs")
-
-
-### Download data. 
-
-# Download Top10NL dataset.
-url_top10 <- 'http://geodata.nationaalgeoregister.nl/top10nl/extract/kaartbladen/TOP10NL_39O.zip?formaat=gml' 
-zip_top10 <- 'downloads/Top10NL.zip'
-download.file(url_top10, zip_top10, mode='auto', quiet=T)
-unzip(zip_top10, exdir = 'data/')
 # Download tree species dataset.
 url_species <- 'http://help.geodesk.nl/download_attachment.php?att_id=400&track=JWH-4VP-G41D&e=louise.searle%40wur.nl'
 zip_species <- 'downloads/TreeSpecies.zip'
-download.file(url_species, zip_species, mode='auto', quiet=T)
+download.file(url_species, zip_species, mode='auto', quiet=F)
 unzip(zip_species, exdir = 'data/')
 # Download tree crowns dataset.
 url_crowns <- 'http://help.geodesk.nl/download_attachment.php?att_id=393&track=JWH-4VP-G41D&e=louise.searle%40wur.nl'
 zip_crowns <- 'downloads/TreeCrowns.zip'
-download.file(url_crowns, zip_crowns, mode='auto', quiet=T)
+download.file(url_crowns, zip_crowns, mode='auto', quiet=F)
 unzip(zip_crowns, exdir = 'data/')
-# Download photo sample data.
+# Download photo sample data. BAD!
 url_photos <- 'https://www.dropbox.com/s/02cwfz0na0cnbm1/CampusPhotos.zip?dl=0'
 zip_photos <- 'downloads/CampusPhotos.zip'
-download(url_photos, zip_photos, mode='wb', quiet=T)
+download(url_photos, zip_photos, mode='wb', quiet=F)
 unzip(zip_photos, exdir = 'photographs/')
+ 
 
+# Step 3 # Load data and set known variables.
 
-### Load data. Not complete!
-
+# Camera model CCD size.
+camera_ccd <- 4.54 # For iPhone 4s in this case.
+# Camera total view distance.
+view_dist <- 150  # I have chosen 150 metres maximum visiblilty.
+# Foreground vegetation removal distance.
+fore_dist <- 10 # I have chosen to remove tree features up to 10 metres from the camera.
+# Tree buffer distance accounting for survey/crown errors.
+tree_error = 2 # 2 metres extra width to crown.
+# Projection WGS.
+prj_WGS <- CRS("+proj=longlat +datum=WGS84")
+# Projection RD New.
+prj_RD <- CRS("+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.2369,50.0087,465.658,-0.406857330322398,0.350732676542563,-1.8703473836068,4.0812 +units=m +no_defs")
 # Load tree crowns.
 crowns_file <- 'data/CampusTreeCrowns.shp'
 crowns <- readOGR(crowns_file, layer=ogrListLayers(crowns_file))
-proj4string(crowns) = prj_RD
+projection(crowns) <- prj_RD
 # Load tree species.
 species_file <- 'data/CampusBomenCobraFeb2012.shp'
 species <- readOGR(species_file, layer=ogrListLayers(species_file))
-# Load features - store as SPolygonsDF. ADD LATER! Difficult.
-# features_file <- 'data/TOP10NL_39O.gml'
-# features <- readOGR(features_file, layer='Gebouw')
+species <- spTransform(species, prj_RD)
 
 
-### Photograph Analysis
+# Step 4 # Get photograph metadata.
 
-# Retrieve exif data from photographs using ExifTool.
+# Retrieve exif data from photographs using ExifTool. 
 exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
 exif_data <- gsub('"','', exif_data)
+##############################################################################################################################################################################################################
+test <- exif_data[1]
+##############################################################################################################################################################################################################
+# Extract relevant data from exif string with regular expression. FUNCTION! extract fov exif data.
+exif_match <- str_match(test, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
+# Store exif data in a dataframe.
+exif.df <- data.frame('Name'=exif_match[,2], 
+                      'FocalLength'=as.double(exif_match[,3]), 
+                      'Direction'=as.integer(exif_match[,12]),
+                      'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
+                      'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
+# Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
+photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+photo_origin <- spTransform(photo_origin, prj_RD)
 
-for(i in 1:length(exif_data){
-  # Extract relevant data from exif string with regular expression.
-  exif_match <- str_match(exif_data[i], "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
-  # Store exif data in a dataframe.
-  exif.df <- data.frame('Name'=exif_match[,2], 'FocalLength'=as.double(exif_match[,3]), 'Direction'=as.integer(exif_match[,12]),
-                        'Latitude'=as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
-                        'Longitude'=as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-  # Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
-  photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
-  photo_origin <- spTransform(photo_origin, prj_RD)
 
-### Quick check all data.
-plot(crowns, col='green')
-plot(species, col='pink', add=T)
-plot(photo_origin, col='blue', add=T)
+# Step 5 # Create theoretical field of view polygon for photograph.
 
-### Create theoretical field of view.
-
-# Calculate points for FOV polygon. Make into complete FOV polygon function later!
-
+# # Calculate points for FOV polygon. FUNCTION! FOV points.
 # Compute field of view angle, converting from radians to degrees.
 fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
-
-### per photo:
-for(i in 1:length())
 # Point 1 coordinates with data frame:
 points_fov <- data.frame('Name' = photo_origin$Name, 'P1X'=photo_origin@coords[,1], 'P1Y'=photo_origin@coords[,2], 'P2X'=NA, 'P2Y'=NA, 'P3X' = NA, 'P3Y'=NA)
-# Point 2 coordinates added to data frame:
+# Point 2 coordinates added to data frame: FUNCTION!
 trig_angle <- photo_origin$Direction-(fov_angle/2)
 trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
-for(i in 1:length(trig_func)){
-  if(trig_func[i]==0){
-    offset_x = sin(trig_angle[i]) * view_dist
-    offset_y = sqrt((view_dist^2) - (offset_x^2))
-    points_fov[i,4] <- points_fov[i,2] + offset_x
-    points_fov[i,5] <- points_fov[i,3] + offset_y
-  } 
-  else{
-    offset_y = cos(trig_angle[i]) * view_dist
-    offset_x = sqrt((view_dist^2) - (offset_y^2))
-    points_fov[i,4] <- points_fov[i,2] + offset_x
-    points_fov[i,5] <- points_fov[i,3] + offset_y
-  }
+trig_dirx <- ifelse(trig_angle<180, 1, 0) 
+trig_diry <- ifelse(trig_angle<90, 1, ifelse(trig_angle<270, 0, 1))
+if(trig_dirx==1){
+    offset_x = abs(sin(trig_angle) * (view_dist+50))
+    points_fov[,4] <- points_fov[,2] + offset_x
+}
+if(trig_dirx==0){
+    offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
+    points_fov[,4] <- points_fov[,2] + offset_x
+}
+if(trig_diry==1){
+    offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
+    points_fov[,5] <- points_fov[,3] + offset_y
+}
+if(trig_diry==0){
+    offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
+    points_fov[,5] <- points_fov[,3] + offset_y
 }
 # Point 3 coordinates added to data frame:
 trig_angle <- photo_origin$Direction+(fov_angle/2) # The difference is the addition of half the fov_angle, rather than subtraction.
 trig_func <- ifelse(trig_angle<45, 1, ifelse(trig_angle<135, 0, ifelse(trig_angle<225, 1, ifelse(trig_angle<315, 0, 1))))
-for(i in 1:length(trig_func)){
-  if(trig_func[i]==0){
-    offset_x = sin(trig_angle[i]) * view_dist
-    offset_y = sqrt((view_dist^2) - (offset_x^2))
-    points_fov[i,6] <- points_fov[i,2] + offset_x
-    points_fov[i,7] <- points_fov[i,3] + offset_y
-  } 
-  else{
-    offset_y = cos(trig_angle[i]) * view_dist
-    offset_x = sqrt((view_dist^2) - (offset_y^2))
-    points_fov[i,6] <- points_fov[i,2] + offset_x
-    points_fov[i,7] <- points_fov[i,3] + offset_y
+trig_dirx <- ifelse(trig_angle<180, 1, 0) 
+trig_diry <- ifelse(trig_angle<90, 1, ifelse(trig_angle<270, 0, 1))
+if(trig_dirx==1){
+    offset_x = abs(sin(trig_angle) * (view_dist+50))
+    points_fov[,6] <- points_fov[,2] + offset_x
+}
+if(trig_dirx==0){
+    offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
+    points_fov[,6] <- points_fov[,2] + offset_x
+}
+if(trig_diry==1){
+    offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
+    points_fov[,7] <- points_fov[,3] + offset_y
+}
+if(trig_diry==0){
+    offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
+    points_fov[,7] <- points_fov[,3] + offset_y
+}
+# Create FOV polygon from points. FUNCTION! Make FOV polygon given points, projection, view max and view min.
+coords_matrix = matrix(c(points_fov[,2], points_fov[,4], points_fov[,6], points_fov[,3], points_fov[,5], points_fov[,7]), nrow=3, ncol=2, byrow=F)
+poly <- Polygon(coords_matrix)
+poly_list <- Polygons(list(poly),1)
+poly_sp <- SpatialPolygons(list(poly_list), proj4string=prj_RD)
+fov_polygon <- SpatialPolygonsDataFrame(poly_sp, points_fov, match.ID=F)
+# Exclude 10 metre buffer from photo origin from mask to remove overhead trees.
+distance_buffer <- buffer(photo_origin, width=view_dist)
+overhead_buffer <- buffer(photo_origin, width=fore_dist)
+fov_distance <- gIntersection(fov_polygon, distance_buffer, byid=T)
+fov_buffer <- gDifference(fov_distance, overhead_buffer, byid=T, )
+
+
+# Step 6 # Intersect landscape features with FOV polygon.
+
+# Intersect tree crowns with FOV, storing as SpatialLinesDataFrame.
+crowns_inter <- gIntersection(crowns, fov_buffer, byid=T)
+crowns_df <- data.frame('ID' = c(1:length(crowns_inter)))
+crowns_inter <- SpatialPolygonsDataFrame(crowns_inter, data=crowns_df, match.ID=F)
+crowns_borders <- as(crowns_inter, "SpatialLinesDataFrame")
+# Create raster of tree crowns, cell values: 1 or NA.
+ext <- extent(crowns_borders)
+ext_rast <- raster(ncol=xmax(ext)-xmin(ext), nrow=ymax(ext)-ymin(ext), crs=prj_RD) 
+extent(ext_rast) <- ext
+crowns_raster <- rasterize(crowns_borders, ext_rast, field=1, background=0)
+# Convert raster to spatial points to extract coordinates, and assign to layers in raster.
+crowns_points <- rasterToPoints(crowns_raster, spatial=T)
+crowns_coords <- rasterize(crowns_points, ext_rast, field=crowns_points@coords, background=NA)
+crowns_raster$targetX <- crowns_coords@data@values[,1]
+crowns_raster$targetY <- crowns_coords@data@values[,2]
+crowns_raster$originX <- photo_origin@coords[,1]
+crowns_raster$originY <- photo_origin@coords[,2]
+
+
+# Step 7 # Visiblity analysis of tree crowns.
+
+# Apply visibility raster function.
+# if (!file.exists(fn <- "data/crowns_raster.rda")) {
+crowns_visible <- crowns_width <- VisRasterTest(crowns_raster)
+#   save(crowns_raster, file = fn)
+# } else {
+#   load(fn)
+# }
+
+# Calculate actual pixel width in metres given distance from origin. FUNCTION!
+for(i in 1:length(crowns_visible)){
+  if(crowns_visible[i] > 0){
+    circ <- 2*pi*(sqrt(((crowns_raster$targetX[i]-photo_origin@coords[1])^2) + ((crowns_raster$targetY[i]-photo_origin@coords[2])^2)))
+    crowns_width[i] <- 1/(circ*(fov_angle/360))
   }
 }
 
-for(i in 1:length(trig_func){
-  polygon()
-  
-  
-# Create FOV polygons from points.
-#fov_polygon <- PolygonFOV(theo_fov)
-# Check FOV polygon.
-#plot(fov_polygon)
-#plot(photos.df, add=T)
+# Assign species and sum of visible pixel width per tree crown. FUNCTION for both!
+for(i in 1:length(crowns_inter)){
+  # Define single tree as raster.
+  tree_poly <- SpatialPolygons(crowns_inter@polygons[i])
+  projection(tree_poly) <- prj_RD
+  tree_buff <- buffer(tree_poly, width=tree_error)
+  tree_raster <- rasterize(tree_buff, ext_rast, background=NA)
+  # Sum number of visible pixels in tree.
+  tree_sum <- zonal(crowns_width, tree_raster, fun='sum', na.rm=T)
+  crowns_inter$sum[i] <- tree_sum[2] 
+  # Intersect tree with species points.
+  tree_int <- gIntersection(species, tree_buff)
+  # If tree species found and visible, retrieve first tree species by matching coordinates with species data set.
+  if((length(tree_int) > 0) & (crowns_inter$sum[i] > 0)){
+    tree_coords <- coordinates(tree_int)
+    for(j in 1:length(species)){
+      if((as.integer(species@coords[j, 1]) == as.integer(tree_coords[1,1])) & (as.integer(species@coords[j, 2]) == as.integer(tree_coords[1,2]))) crowns_inter$species[i] <- as.character(species$Boomsoort[j])
+    } 
+  } else{
+    crowns_inter$species[i] <- 'Not available'
+  }
+}
+
+# Step 8 # Assign tree species to visible tree crowns.
+
+# Store species and number of visible pixels for visible trees in data frame.
+crowns_inter$proportion = (crowns_inter$sum/sum(crowns_inter$sum))*100
+vis_trees_df <- data.frame(Species= crowns_inter$species[crowns_inter$sum > 0], Visibility = crowns_inter$sum[crowns_inter$sum > 0], Proportion = crowns_inter$proportion[crowns_inter$sum > 0])
+print(vis_trees_df)
 
 
-### Intersect landscape features with FOV polygon
-## return raster of cells with a feature or not, call values: feature id or NA
-# feature_raster <- 
+
+# ### Check:
+# plot(fov_buffer)
+# plot(crowns, col='green', add=T)
+# plot(photo_origin, col='red', add=T)
+# plot(crowns_inter, col='darkgreen', add=T)
+# plot(fov_buffer, add=T)
+# 
+# plot(fov_buffer)
+# plot(photo_origin, col='magenta', add=T)
+# plot(crowns, col='green', add=T)
+# plot(crowns_inter, col='seagreen', add=T)
+# plot(species, col='red', cex=1.5, add=T)
+# plot(fov_buffer, add=T)
+
+# Create spatial polygons data frame
+# vis_species <- SpatialPolygonsDataFrame(, data = vis_species_df, match.ID=F)
+# species_list <- list(crowns_inter$species)
+# x <- rasterize(crowns_inter, ext_rast, field='sum', background=NA)
+# y <- rasterize(crowns_inter, ext_rast, field=species_list, background=NA)
+# vis_species_df <- data.frame(Species = crowns_inter$species)
+# x$species <- vis_species_df
 
 
-### Visiblity analysis of tree features
-## calculate visible or not, output: raster 1 or 0
-# visible_feat <- Visibility(position, feature_raster)
-## sum visible pixels per tree feature in view
-# visible_trees <- selection
-## calculate percentage width of tree features in view
-# width_trees <- FeatureWidth(visible_trees)
+# Visualisation
 
+# spplot(crowns_inter, zcol='proportion')
+# perc_plot <- barplot(crowns_inter$proportion,col=rainbow(5),beside=F)
 
+# crownsWGS <- spTransform(crowns_inter, prj_WGS)
+# crowns_inter@data$id <- rownames(crowns_inter@data)
+# crownsGGstr <- fortify(crowns_inter, region = 'id')
+# crownsGGmerge <- merge(crownsGGstr, crowns_inter@data, by = "id")
+# head(crownsGGmerge)
+# bounding <- bbox(crownsWGS)
+# campus_map <- ggmap(get_map(location = bounding, maptype = "satellite", zoom = 6))
+# crownsGGplot <- ggplot(data = crownsGGmerge, aes(x=long, y=lat, group = group,
+#                                               fill = species)) +
+#   geom_polygon()  +
+#   geom_path(color = "white") +
+#   scale_fill_hue(l = 40) +
+#   coord_equal() +
+#   theme(legend.position = 'right', title = 'trees',
+#         axis.text = element_blank())
+# 
+# print(crownsGGplot)
 ### Determine visible tree species
 ## Determine tree species per tree feature in view
-# species_trees <- TreeSpecies(features, species)
-## Add to SPolygonDF or list
