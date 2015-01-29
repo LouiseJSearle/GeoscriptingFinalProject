@@ -4,7 +4,7 @@
 #!/bin/sh
 echo 'Install ExifTool script'
 echo 'Creating project directories'
-mkdir -p /Users/Louise/GeoscriptingProjectLouiseSearle/{photographs,downloads,data,results}
+mkdir -p /Users/Louise/GeoscriptingProjectLouiseSearle/{downloads,data,results}
 echo 'Complete'
 echo 'Downloading ExifTool package'
 cd /Users/Louise/GeoscriptingProjectLouiseSearle/downloads
