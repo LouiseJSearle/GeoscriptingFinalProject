@@ -7,8 +7,7 @@
 ### Within this extent, the whether a tree feature is visible or not will be determined using a visability algorithm applied to a surface elevation dataset. 
 ###
 ### Input data: One or more geo-located photographs. 
-### Outputs: 
-
+### Outputs: Plots of visible trees, and proportion of visibility, and table of visible species.
 
 # Step 0 # Install Exiftool package.
 
