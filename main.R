@@ -141,3 +141,9 @@ text(photo_origin@coords, labels=as.character('Camera position'), cex=1.1, font=
 
 # Plot proportional visibility of tree crowns.
 spplot(crowns_species, zcol='proportion', main=paste('Proportional Visibility of Tree Crowns for Photograph: ', photo_origin$Name))
+
+# Export visible trees dataframe.
+photo_name <- gsub(".JPG", '', photo_selection, fixed = TRUE)
+path <- paste('results/', photo_name, '.txt')
+path <- gsub(" ", '', path, fixed = TRUE)
+write.table(vis_trees_df, path, sep="\t")
