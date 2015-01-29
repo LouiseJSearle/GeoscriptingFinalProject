@@ -97,8 +97,10 @@ photo_origin <- spTransform(photo_origin, prj_RD)
 
 # Step 5 # Create theoretical field of view polygon for photograph.
 
+# Calculate field of view angle with conversion from radians to degrees, given photo exif data and camera ccd. 
+fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
 # Calculate point coordinates for FOV polygon.
-points_fov <- PointsFOV(photo_origin, camera_ccd, max_dist)
+points_fov <- PointsFOV(photo_origin, max_dist, fov_angle)
 # Create FOV polygon from points.
 fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
 
@@ -106,84 +108,50 @@ fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
 
 # Intersect tree crowns in field of view.
 crowns_inter <- gIntersection(crowns, fov_polygon, byid=T)
-# Store intersected crowns as raster layer, with stored coordinates of cells and camera position.
-crowns_raster <- TreesFOV(crowns_inter, photo_origin)
-
-# Step 7 # Visiblity analysis of tree crowns.
-
-# Apply visibility raster function.
-# if (!file.exists(fn <- "data/crowns_raster.rda")) {
-crowns_visible <- crowns_width <- VisRasterTest(crowns_raster)
-#   save(crowns_raster, file = fn)
-# } else {
-#   load(fn)
-# }
-
-# Calculate actual pixel width in metres given distance from origin. FUNCTION!
-for(i in 1:length(crowns_visible)){
-  if(crowns_visible[i] > 0){
-    circ <- 2*pi*(sqrt(((crowns_raster$targetX[i]-photo_origin@coords[1])^2) + ((crowns_raster$targetY[i]-photo_origin@coords[2])^2)))
-    crowns_width[i] <- 1/(circ*(fov_angle/360))
-  }
-}
-
-# Assign species and sum of visible pixel width per tree crown. FUNCTION for both!
-for(i in 1:length(crowns_inter)){
-  # Define single tree as raster.
-  tree_poly <- SpatialPolygons(crowns_inter@polygons[i])
-  projection(tree_poly) <- prj_RD
-  tree_buff <- buffer(tree_poly, width=tree_error)
-  tree_raster <- rasterize(tree_buff, ext_rast, background=NA)
-  # Sum number of visible pixels in tree.
-  tree_sum <- zonal(crowns_width, tree_raster, fun='sum', na.rm=T)
-  crowns_inter$sum[i] <- tree_sum[2] 
-  # Intersect tree with species points.
-  tree_int <- gIntersection(species, tree_buff)
-  # If tree species found and visible, retrieve first tree species by matching coordinates with species data set.
-  if((length(tree_int) > 0) & (crowns_inter$sum[i] > 0)){
-    tree_coords <- coordinates(tree_int)
-    for(j in 1:length(species)){
-      if((as.integer(species@coords[j, 1]) == as.integer(tree_coords[1,1])) & (as.integer(species@coords[j, 2]) == as.integer(tree_coords[1,2]))) 
-        crowns_inter$species[i] <- as.character(species$Boomsoort[j])
-    } 
-  } else{
-    crowns_inter$species[i] <- 'Not available'
-  }
-}
-
-# Step 8 # Assign tree species to visible tree crowns.
-
-# Store species and number of visible pixels for visible trees in data frame.
-crowns_inter$proportion = (crowns_inter$sum/sum(crowns_inter$sum))*100
-vis_trees_df <- data.frame('Species' = crowns_inter$species[crowns_inter$sum > 0], 
-                           'Visibility' = crowns_inter$sum[crowns_inter$sum > 0], 
-                           'Proportion' = crowns_inter$proportion[crowns_inter$sum > 0])
-print(vis_trees_df)
+# Determine extent of intersected tree crowns.
+ext <- extent(crowns_inter)
+ext_rast <- raster(ncol=xmax(ext)-xmin(ext), nrow=ymax(ext)-ymin(ext), crs=prj_RD) 
+extent(ext_rast) <- ext
+# Convert intersected crowns to raster layer, with stored coordinates of cells and camera position.
+crowns_raster <- TreesFOV(crowns_inter, photo_origin, ext_rast)
+# Determine visibility of cells in tree crowns raster. 
+crowns_visible <- VisibilityFOV(crowns_raster)
+# Calculate relative cell width given distance from origin.
+target_x <- crowns_raster$targetX
+target_y <- crowns_raster$targetY
+crowns_width <- CellWidth(crowns_visible, photo_origin, target_x, target_y, fov_angle)
+# Determine sum of visible cell width per tree crown.
+crowns_df <- data.frame('id' = 1:length(crowns_inter), 'Visibility'=NA)
+crowns_sum <- SpatialPolygonsDataFrame(crowns_inter, data=crowns_df, match.ID=F)
+crowns_sum <- SumVisible(crowns_sum, crowns_width, tree_error, prj_RD, ext_rast)
 
 
+# Step 7 # Determine visible tree species.
 
-# ### Check:
-# plot(fov_polygon)
-# plot(crowns, col='green', add=T)
-# plot(photo_origin, col='red', add=T)
-# plot(crowns_inter, col='darkgreen', add=T)
-# plot(fov_polygon, add=T)
-# 
-# plot(fov_polygon)
-# plot(photo_origin, col='magenta', add=T)
-# plot(crowns, col='green', add=T)
-# plot(crowns_inter, col='seagreen', add=T)
-# plot(species, col='red', cex=1.5, add=T)
-# plot(fov_polygon, add=T)
+# Assign tree species to visible tree crowns.
+crowns_species <- SpeciesVisible(crowns_sum, species, prj_RD, tree_error)
+# Store species and relative width of visible trees in data frame.
+crowns_species$proportion = (crowns_species$Visibility/sum(crowns_species$Visibility))*100
+vis_trees_df <- data.frame('Species' = crowns_species$species[crowns_species$Visibility > 0], 
+                           'Visibility' = crowns_species$Visibility[crowns_species$Visibility > 0], 
+                           'Proportion' = crowns_species$proportion[crowns_species$Visibility > 0])
 
-# Create spatial polygons data frame
-# vis_species <- SpatialPolygonsDataFrame(, data = vis_species_df, match.ID=F)
-# species_list <- list(crowns_inter$species)
-# x <- rasterize(crowns_inter, ext_rast, field='sum', background=NA)
-# y <- rasterize(crowns_inter, ext_rast, field=species_list, background=NA)
-# vis_species_df <- data.frame(Species = crowns_inter$species)
-# x$species <- vis_species_df
+# Step 8 # Visualisation and results.
+### Check:
+plot(fov_polygon)
+plot(crowns, col='green', add=T)
+plot(photo_origin, col='red', add=T)
+plot(crowns_inter, col='darkgreen', add=T)
+plot(fov_polygon, add=T)
 
+plot(fov_polygon)
+plot(photo_origin, col='magenta', add=T)
+plot(crowns, col='green', add=T)
+plot(crowns_inter, col='seagreen', add=T)
+plot(species, col='red', cex=1.5, add=T)
+plot(fov_polygon, add=T)
+
+spplot(crowns_species, zcol='proportion')
 
 # Visualisation
 
@@ -207,77 +175,3 @@ print(vis_trees_df)
 #         axis.text = element_blank())
 # 
 # print(crownsGGplot)
-### Determine visible tree species
-## Determine tree species per tree feature in view
-
-
-###### FUNCTION CONTENT############################################################################################################
-
-
-# coords_matrix = matrix(c(points_fov[,2], points_fov[,4], points_fov[,6], points_fov[,3], points_fov[,5], points_fov[,7]), nrow=3, ncol=2, byrow=F)
-# poly <- Polygon(coords_matrix)
-# poly_list <- Polygons(list(poly),1)
-# poly_sp <- SpatialPolygons(list(poly_list), proj4string=prj_RD)
-# fov_polygon <- SpatialPolygonsDataFrame(poly_sp, points_fov, match.ID=F)
-
-
-# # Compute field of view angle, converting from radians to degrees.
-# fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
-# # Point 1 coordinates with data frame:
-# points_fov <- data.frame('Name' = photo_origin$Name, 
-#                          'P1X' = photo_origin@coords[,1], 
-#                          'P1Y' = photo_origin@coords[,2], 
-#                          'P2X' = NA, 
-#                          'P2Y' = NA, 
-#                          'P3X' = NA, 
-#                          'P3Y' = NA)
-# # Point 2 coordinates added to data frame: FUNCTION!
-# trig_angle <- photo_origin$Direction-(fov_angle/2)
-# trig_func <- ifelse(trig_angle<45, 1, 
-#                     ifelse(trig_angle<135, 0, 
-#                            ifelse(trig_angle<225, 1, 
-#                                   ifelse(trig_angle<315, 0, 1))))
-# trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-# trig_diry <- ifelse(trig_angle<90, 1, 
-#                     ifelse(trig_angle<270, 0, 1))
-# if(trig_dirx==1){
-#     offset_x = abs(sin(trig_angle) * (view_dist+50))
-#     points_fov[,4] <- points_fov[,2] + offset_x
-# }
-# if(trig_dirx==0){
-#     offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
-#     points_fov[,4] <- points_fov[,2] + offset_x
-# }
-# if(trig_diry==1){
-#     offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
-#     points_fov[,5] <- points_fov[,3] + offset_y
-# }
-# if(trig_diry==0){
-#     offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
-#     points_fov[,5] <- points_fov[,3] + offset_y
-# }
-# # Point 3 coordinates added to data frame:
-# trig_angle <- photo_origin$Direction+(fov_angle/2)
-# trig_func <- ifelse(trig_angle<45, 1, 
-#                     ifelse(trig_angle<135, 0, 
-#                            ifelse(trig_angle<225, 1, 
-#                                   ifelse(trig_angle<315, 0, 1))))
-# trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-# trig_diry <- ifelse(trig_angle<90, 1, 
-#                     ifelse(trig_angle<270, 0, 1))
-# if(trig_dirx==1){
-#     offset_x = abs(sin(trig_angle) * (view_dist+50))
-#     points_fov[,6] <- points_fov[,2] + offset_x
-# }
-# if(trig_dirx==0){
-#     offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
-#     points_fov[,6] <- points_fov[,2] + offset_x
-# }
-# if(trig_diry==1){
-#     offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
-#     points_fov[,7] <- points_fov[,3] + offset_y
-# }
-# if(trig_diry==0){
-#     offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
-#     points_fov[,7] <- points_fov[,3] + offset_y
-# }

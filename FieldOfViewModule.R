@@ -2,15 +2,13 @@
 
 ## Field of View Module
 
-PointsFOV <- function(photo, ccd, distance){
-  # Calculate field of view angle with conversion from radians to degrees, given photo exif data and camera ccd. 
-  fov_angle <- (2*atan(camera_ccd/(2*photo$FocalLength)))*(180/pi)
+PointsFOV <- function(photo, distance, angle){
   # Initiate field of view points coordinates data frame, with photo camera position as first point.
   points_fov <- data.frame('Name' = photo$Name, 
                            'P1X' = photo@coords[,1], 
                            'P1Y' = photo@coords[,2])
   # Calculate coordinates of points, given photo exif data and field of view angle.
-  points <- PointsPosFOV(photo, fov_angle, distance)
+  points <- PointsPosFOV(photo, angle, distance)
   # Add points to field of view points data frame.
   points_fov['P2X'] <- points[1,1]
   points_fov['P2Y'] <- points[1,2]
