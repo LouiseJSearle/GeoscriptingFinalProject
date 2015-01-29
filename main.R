@@ -24,7 +24,7 @@
 
 packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
-source('VisRasterTest.R')
+source('FieldOfViewModule.R')
 
 
 # Step 2 # Download data. 
@@ -50,12 +50,12 @@ unzip(zip_photos, exdir = 'photographs/')
 
 # Camera model CCD size.
 camera_ccd <- 4.54 # For iPhone 4s in this case.
-# Camera total view distance.
-view_dist <- 150  # I have chosen 150 metres maximum visiblilty.
-# Foreground vegetation removal distance.
-fore_dist <- 10 # I have chosen to remove tree features up to 10 metres from the camera.
-# Tree buffer distance accounting for survey/crown errors.
-tree_error = 2 # 2 metres extra width to crown.
+# Camera max view distance.
+max_dist <- 150 # I have chosen that the camera sees features no further than 150 metres from the camera position.
+# Camera min view distance.
+min_dist <- 10 # I have chosen that the camera does not see features less than 10 metres from the camera position.
+# Tree buffer distance (to account for minor species/crown position errors from dataset)
+tree_error = 2 # 2 metres extra width to crown when assigning species.
 # Projection WGS.
 prj_WGS <- CRS("+proj=longlat +datum=WGS84")
 # Projection RD New.
@@ -86,91 +86,23 @@ exif.df <- data.frame('Name' = exif_match[,2],
                       'Direction' = as.integer(exif_match[,12]),
                       'Latitude' = as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
                       'Longitude' = as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-# Create photo spatial points data frame, and reproject coordinates from WGS to RD New.
+# Create SpatialPointsDataFrame for photograph at camera position.
 photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+# Reproject coordinates from WGS to RD New.
 photo_origin <- spTransform(photo_origin, prj_RD)
 
 
 # Step 5 # Create theoretical field of view polygon for photograph.
 
-# # Calculate points for FOV polygon. FUNCTION! FOV points.
-# Compute field of view angle, converting from radians to degrees.
-fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
-# Point 1 coordinates with data frame:
-points_fov <- data.frame('Name' = photo_origin$Name, 
-                         'P1X' = photo_origin@coords[,1], 
-                         'P1Y' = photo_origin@coords[,2], 
-                         'P2X' = NA, 
-                         'P2Y' = NA, 
-                         'P3X' = NA, 
-                         'P3Y' = NA)
-# Point 2 coordinates added to data frame: FUNCTION!
-trig_angle <- photo_origin$Direction-(fov_angle/2)
-trig_func <- ifelse(trig_angle<45, 1, 
-                    ifelse(trig_angle<135, 0, 
-                           ifelse(trig_angle<225, 1, 
-                                  ifelse(trig_angle<315, 0, 1))))
-trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-trig_diry <- ifelse(trig_angle<90, 1, 
-                    ifelse(trig_angle<270, 0, 1))
-if(trig_dirx==1){
-    offset_x = abs(sin(trig_angle) * (view_dist+50))
-    points_fov[,4] <- points_fov[,2] + offset_x
-}
-if(trig_dirx==0){
-    offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
-    points_fov[,4] <- points_fov[,2] + offset_x
-}
-if(trig_diry==1){
-    offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
-    points_fov[,5] <- points_fov[,3] + offset_y
-}
-if(trig_diry==0){
-    offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
-    points_fov[,5] <- points_fov[,3] + offset_y
-}
-# Point 3 coordinates added to data frame:
-trig_angle <- photo_origin$Direction+(fov_angle/2)
-trig_func <- ifelse(trig_angle<45, 1, 
-                    ifelse(trig_angle<135, 0, 
-                           ifelse(trig_angle<225, 1, 
-                                  ifelse(trig_angle<315, 0, 1))))
-trig_dirx <- ifelse(trig_angle<180, 1, 0) 
-trig_diry <- ifelse(trig_angle<90, 1, 
-                    ifelse(trig_angle<270, 0, 1))
-if(trig_dirx==1){
-    offset_x = abs(sin(trig_angle) * (view_dist+50))
-    points_fov[,6] <- points_fov[,2] + offset_x
-}
-if(trig_dirx==0){
-    offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
-    points_fov[,6] <- points_fov[,2] + offset_x
-}
-if(trig_diry==1){
-    offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
-    points_fov[,7] <- points_fov[,3] + offset_y
-}
-if(trig_diry==0){
-    offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
-    points_fov[,7] <- points_fov[,3] + offset_y
-}
-# Create FOV polygon from points. FUNCTION! Make FOV polygon given points, projection, view max and view min.
-coords_matrix = matrix(c(points_fov[,2], points_fov[,4], points_fov[,6], points_fov[,3], points_fov[,5], points_fov[,7]), nrow=3, ncol=2, byrow=F)
-poly <- Polygon(coords_matrix)
-poly_list <- Polygons(list(poly),1)
-poly_sp <- SpatialPolygons(list(poly_list), proj4string=prj_RD)
-fov_polygon <- SpatialPolygonsDataFrame(poly_sp, points_fov, match.ID=F)
-# Exclude 10 metre buffer from photo origin from mask to remove overhead trees.
-distance_buffer <- buffer(photo_origin, width=view_dist)
-overhead_buffer <- buffer(photo_origin, width=fore_dist)
-fov_distance <- gIntersection(fov_polygon, distance_buffer, byid=T)
-fov_buffer <- gDifference(fov_distance, overhead_buffer, byid=T, )
-
+# Calculate point coordinates for FOV polygon.
+points_fov <- PointsFOV(photo_origin, camera_ccd, max_dist)
+# Create FOV polygon from points.
+fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
 
 # Step 6 # Intersect landscape features with FOV polygon.
 
 # Intersect tree crowns with FOV, storing as SpatialLinesDataFrame.
-crowns_inter <- gIntersection(crowns, fov_buffer, byid=T)
+crowns_inter <- gIntersection(crowns, fov_polygon, byid=T)
 crowns_df <- data.frame('ID' = c(1:length(crowns_inter)))
 crowns_inter <- SpatialPolygonsDataFrame(crowns_inter, data=crowns_df, match.ID=F)
 crowns_borders <- as(crowns_inter, "SpatialLinesDataFrame")
@@ -234,26 +166,26 @@ for(i in 1:length(crowns_inter)){
 
 # Store species and number of visible pixels for visible trees in data frame.
 crowns_inter$proportion = (crowns_inter$sum/sum(crowns_inter$sum))*100
-vis_trees_df <- data.frame(Species= crowns_inter$species[crowns_inter$sum > 0], 
-                           Visibility = crowns_inter$sum[crowns_inter$sum > 0], 
-                           Proportion = crowns_inter$proportion[crowns_inter$sum > 0])
+vis_trees_df <- data.frame('Species' = crowns_inter$species[crowns_inter$sum > 0], 
+                           'Visibility' = crowns_inter$sum[crowns_inter$sum > 0], 
+                           'Proportion' = crowns_inter$proportion[crowns_inter$sum > 0])
 print(vis_trees_df)
 
 
 
 # ### Check:
-# plot(fov_buffer)
+# plot(fov_polygon)
 # plot(crowns, col='green', add=T)
 # plot(photo_origin, col='red', add=T)
 # plot(crowns_inter, col='darkgreen', add=T)
-# plot(fov_buffer, add=T)
+# plot(fov_polygon, add=T)
 # 
-# plot(fov_buffer)
+# plot(fov_polygon)
 # plot(photo_origin, col='magenta', add=T)
 # plot(crowns, col='green', add=T)
 # plot(crowns_inter, col='seagreen', add=T)
 # plot(species, col='red', cex=1.5, add=T)
-# plot(fov_buffer, add=T)
+# plot(fov_polygon, add=T)
 
 # Create spatial polygons data frame
 # vis_species <- SpatialPolygonsDataFrame(, data = vis_species_df, match.ID=F)
@@ -288,3 +220,75 @@ print(vis_trees_df)
 # print(crownsGGplot)
 ### Determine visible tree species
 ## Determine tree species per tree feature in view
+
+
+###### FUNCTION CONTENT############################################################################################################
+
+
+# coords_matrix = matrix(c(points_fov[,2], points_fov[,4], points_fov[,6], points_fov[,3], points_fov[,5], points_fov[,7]), nrow=3, ncol=2, byrow=F)
+# poly <- Polygon(coords_matrix)
+# poly_list <- Polygons(list(poly),1)
+# poly_sp <- SpatialPolygons(list(poly_list), proj4string=prj_RD)
+# fov_polygon <- SpatialPolygonsDataFrame(poly_sp, points_fov, match.ID=F)
+
+
+# # Compute field of view angle, converting from radians to degrees.
+# fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
+# # Point 1 coordinates with data frame:
+# points_fov <- data.frame('Name' = photo_origin$Name, 
+#                          'P1X' = photo_origin@coords[,1], 
+#                          'P1Y' = photo_origin@coords[,2], 
+#                          'P2X' = NA, 
+#                          'P2Y' = NA, 
+#                          'P3X' = NA, 
+#                          'P3Y' = NA)
+# # Point 2 coordinates added to data frame: FUNCTION!
+# trig_angle <- photo_origin$Direction-(fov_angle/2)
+# trig_func <- ifelse(trig_angle<45, 1, 
+#                     ifelse(trig_angle<135, 0, 
+#                            ifelse(trig_angle<225, 1, 
+#                                   ifelse(trig_angle<315, 0, 1))))
+# trig_dirx <- ifelse(trig_angle<180, 1, 0) 
+# trig_diry <- ifelse(trig_angle<90, 1, 
+#                     ifelse(trig_angle<270, 0, 1))
+# if(trig_dirx==1){
+#     offset_x = abs(sin(trig_angle) * (view_dist+50))
+#     points_fov[,4] <- points_fov[,2] + offset_x
+# }
+# if(trig_dirx==0){
+#     offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
+#     points_fov[,4] <- points_fov[,2] + offset_x
+# }
+# if(trig_diry==1){
+#     offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
+#     points_fov[,5] <- points_fov[,3] + offset_y
+# }
+# if(trig_diry==0){
+#     offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
+#     points_fov[,5] <- points_fov[,3] + offset_y
+# }
+# # Point 3 coordinates added to data frame:
+# trig_angle <- photo_origin$Direction+(fov_angle/2)
+# trig_func <- ifelse(trig_angle<45, 1, 
+#                     ifelse(trig_angle<135, 0, 
+#                            ifelse(trig_angle<225, 1, 
+#                                   ifelse(trig_angle<315, 0, 1))))
+# trig_dirx <- ifelse(trig_angle<180, 1, 0) 
+# trig_diry <- ifelse(trig_angle<90, 1, 
+#                     ifelse(trig_angle<270, 0, 1))
+# if(trig_dirx==1){
+#     offset_x = abs(sin(trig_angle) * (view_dist+50))
+#     points_fov[,6] <- points_fov[,2] + offset_x
+# }
+# if(trig_dirx==0){
+#     offset_x = -1*abs((sin(trig_angle) * (view_dist+50)))
+#     points_fov[,6] <- points_fov[,2] + offset_x
+# }
+# if(trig_diry==1){
+#     offset_y = abs(sqrt(((view_dist+50)^2) - (offset_x^2)))
+#     points_fov[,7] <- points_fov[,3] + offset_y
+# }
+# if(trig_diry==0){
+#     offset_y = -1*abs((sqrt(((view_dist+50)^2) - (offset_x^2))))
+#     points_fov[,7] <- points_fov[,3] + offset_y
+# }
