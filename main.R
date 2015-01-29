@@ -24,6 +24,7 @@
 
 packages <- c('downloader', 'raster', 'rgeos', 'stringr', 'sp', 'rgdal', 'spgrass6', 'ggplot2', 'ggmap')
 lapply(packages, library, character.only=T)
+source('PhotographModule.R')
 source('FieldOfViewModule.R')
 source('VisibilityModule.R')
 
@@ -40,15 +41,12 @@ url_crowns <- 'http://help.geodesk.nl/download_attachment.php?att_id=393&track=J
 zip_crowns <- 'downloads/TreeCrowns.zip'
 download.file(url_crowns, zip_crowns, mode='auto', quiet=F)
 unzip(zip_crowns, exdir = 'data/')
-# Download photo sample data. BAD!
-url_photos <- 'https://www.dropbox.com/s/02cwfz0na0cnbm1/CampusPhotos.zip?dl=0'
-zip_photos <- 'downloads/CampusPhotos.zip'
-download(url_photos, zip_photos, mode='wb', quiet=F)
-unzip(zip_photos, exdir = 'photographs/')
  
 
 # Step 3 # Load data and set known variables.
 
+# Select photograph to analyse.
+photo_selection <- 'IMG_5090.JPG'
 # Camera model CCD size.
 camera_ccd <- 4.54 # For iPhone 4s in this case.
 # Camera max view distance.
@@ -73,24 +71,16 @@ species <- spTransform(species, prj_RD)
 
 # Step 4 # Get photograph metadata.
 
-# Retrieve exif data from photographs using ExifTool. 
-exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
-exif_data <- gsub('"','', exif_data)
-
-##############################################################################################################################################################################################################
-test <- exif_data[1]
-##############################################################################################################################################################################################################
-
-# Extract relevant data from exif string with regular expression. FUNCTION! extract fov exif data.
-exif_match <- str_match(test, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
-# Store exif data in a dataframe.
-exif.df <- data.frame('Name' = exif_match[,2], 
-                      'FocalLength' = as.double(exif_match[,3]), 
-                      'Direction' = as.integer(exif_match[,12]),
-                      'Latitude' = as.double(exif_match[,4])+(as.double(exif_match[,5])/60)+(as.double(exif_match[,6])/3600),  
-                      'Longitude' = as.double(exif_match[,8])+(as.double(exif_match[,9])/60)+(as.double(exif_match[,10])/3600))
-# Create SpatialPointsDataFrame for photograph at camera position.
-photo_origin <- SpatialPointsDataFrame(exif.df, coords=c(exif.df['Longitude'], exif.df['Latitude']), proj4string=prj_WGS)
+# Retrieve exif data from photograph.
+photo_list <- list.files('photographs/')
+for(i in 1:length(photo_list)){
+  if(photo_list[i] == photo_selection){
+    photo_position <- i
+  }
+}
+photo_exif <- ExifData(photo_position)
+# Create SpatialPointsDataFrame for photograph at camera position with exif data.
+photo_origin <- SpatialPointsDataFrame(photo_exif, coords=c(photo_exif['Longitude'], photo_exif['Latitude']), proj4string=prj_WGS)
 # Reproject coordinates from WGS to RD New.
 photo_origin <- spTransform(photo_origin, prj_RD)
 
@@ -103,6 +93,7 @@ fov_angle <- (2*atan(camera_ccd/(2*photo_origin$FocalLength)))*(180/pi)
 points_fov <- PointsFOV(photo_origin, max_dist, fov_angle)
 # Create FOV polygon from points.
 fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
+
 
 # Step 6 # Visiblity analysis of tree crowns.
 
@@ -137,21 +128,24 @@ vis_trees_df <- data.frame('Species' = crowns_species$species[crowns_species$Vis
                            'Proportion' = crowns_species$proportion[crowns_species$Visibility > 0])
 
 # Step 8 # Visualisation and results.
-### Check:
-plot(fov_polygon)
-plot(crowns, col='green', add=T)
-plot(photo_origin, col='red', add=T)
-plot(crowns_inter, col='darkgreen', add=T)
-plot(fov_polygon, add=T)
 
-plot(fov_polygon)
-plot(photo_origin, col='magenta', add=T)
-plot(crowns, col='green', add=T)
-plot(crowns_inter, col='seagreen', add=T)
-plot(species, col='red', cex=1.5, add=T)
-plot(fov_polygon, add=T)
-
-spplot(crowns_species, zcol='proportion')
+# # Plot field of view tree crowns.
+# plot(fov_polygon)
+# plot(crowns, col='green', add=T)
+# plot(photo_origin, col='red', add=T)
+# plot(crowns_inter, col='darkgreen', add=T)
+# plot(fov_polygon, add=T)
+# bbox(add=T)
+# 
+# # Plot
+# plot(fov_polygon)
+# plot(photo_origin, col='magenta', add=T)
+# plot(crowns, col='green', add=T)
+# plot(crowns_inter, col='seagreen', add=T)
+# plot(species, col='red', cex=1.5, add=T)
+# plot(fov_polygon, add=T)
+# 
+# spplot(crowns_species, zcol='proportion')
 
 # Visualisation
 
