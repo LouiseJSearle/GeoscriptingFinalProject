@@ -38,7 +38,7 @@ VisibilityFOV <- function(stack){
   #' Calculates the line of sight visibility of cells in a raster.
   #' @param stack A raster stack, with layers indicating features to be analysed and coordinates for the features along with view position.
   #' @return stack parameter raster with additional layer indicating if a cell is visible or not by values 1 or 0.
-  stack$visible <- 0
+  stack$visible <- NA
   # create progress bar
   print('Progress %:')
   progress <- percent <- as.integer(ncell(stack)/100)

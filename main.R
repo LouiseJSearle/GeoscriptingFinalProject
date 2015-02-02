@@ -133,12 +133,43 @@ vis_trees_df <- data.frame('Species' = crowns_result$Species[crowns_result$Visib
                            'Proportion' = crowns_result$Proportion[crowns_result$Visible > 0])
 
 
-# Step 8 # Visualisation and results.
+# Step 8 # Visualisation and results ################################################################
 
+# Define plot extent
+extent_fov <- extent(fov_polygon)
+plot_extent <- extent(c(extent_fov[1]-30, extent_fov[2]+30, extent_fov[3]-30, extent_fov[4]+30))
+background <- raster(plot_extent, vals=1)
 
+# Presentation plot: Field of view with intersected tree crowns.
+file_name <- gsub('.JPG','_CrownsFOV.jpeg', photo_selection)
+file_path <- sprintf('results/%s', file_name)
+jpeg(filename=file_path)
+plot(background, axes=F)
+plot(crowns, col='darkgreen', add=T)
+plot(fov_polygon, add=T)
+plot(crowns_inter, col='green', add=T)
+plot(photo_origin, col='red', cex=1.5, add=T)
+dev.off()
 
-# 
-# # Plot field of view tree crowns.
+# Presentation plot: Visible cells of tree crowns.
+visible_buffer <- buffer(crowns_visible, width=1)
+file_name <- gsub('.JPG','_CrownsVis.jpeg', photo_selection)
+file_path <- sprintf('results/%s', file_name)
+jpeg(filename=file_path)
+plot(background, axes=T)
+plot(fov_polygon, add=T)
+plot(crowns_inter, col='green', add=T)
+plot(visible_buffer, col='darkorchid1', add=T)
+plot(photo_origin, col='red', cex=1.5, add=T)
+dev.off()
+
+spplot(crowns_result, zcol='Proportion')
+spplot(crowns_result, zcol='Proportion', add=T)
+
+spplot(background, col='white', main = "testing testing", sp.layout =
+         list(list(crowns, col='seashell'),
+              list('sp.polygons', crowns_inter, col="seashell2", lty=3, lwd=1), 
+              list('sp.polygons', crowns_result$Visible, col='green')))
 # plot(fov_polygon)
 # plot(crowns, col='green', add=T)
 # plot(photo_origin, col='red', add=T)
