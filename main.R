@@ -31,7 +31,7 @@ source('R/VisibilityModule.R')
 # Step 2 # Set known variables ######################################################
 
 # Photograph to analyse.
-photo_selection <-'IMG_5099.JPG'
+photo_selection <-'IMG_5090.JPG'
 
 # Camera model CCD size.
 camera_ccd <- 4.54 # For iPhone 4s in this case.
@@ -96,7 +96,7 @@ fov_polygon <- PolygonFOV(photo_origin, points_fov, prj_RD, min_dist, max_dist)
 # Step 6 # Visiblity analysis of tree crowns ######################################################
 
 # Intersect tree crowns in field of view.
-crowns_inter <- gIntersection(crowns, fov_polygon, byid=T)
+crowns_inter <- gIntersection(crowns, fov_polygon, byid=T, id=row.names(crowns))
 # Determine extent of intersected tree crowns.
 ext <- extent(crowns_inter)
 ext_rast <- raster(ncol=xmax(ext)-xmin(ext), nrow=ymax(ext)-ymin(ext), crs=prj_RD) 
@@ -115,7 +115,7 @@ crowns_width <- CellWidth(crowns_visible, photo_origin, target_x, target_y, fov_
 
 # Create spatial polygons data frame to store results simply for plotting.
 crowns_df <- data.frame('id' = 1:length(crowns_inter), 'Species'=NA, 'Visible'=NA, 'Proportion'=NA)
-crowns_result <- SpatialPolygonsDataFrame(crowns_inter, data=crowns_df, match.ID=F)
+crowns_result <- SpatialPolygonsDataFrame(crowns[row.names(crowns_inter),], data=crowns_df, match.ID=F)
 # Determine species and width of visible cells per visible tree crown.
 for(i in 1:length(crowns_result)){
   # Buffer tree crown to overlap adjacent points and pixels.
@@ -138,88 +138,11 @@ vis_trees_df <- data.frame('Species' = crowns_result$Species[crowns_result$Visib
 # Define plot extent
 extent_fov <- extent(fov_polygon)
 plot_extent <- extent(c(extent_fov[1]-30, extent_fov[2]+30, extent_fov[3]-30, extent_fov[4]+30))
-background <- raster(plot_extent, vals=1)
+background <- raster(plot_extent, vals=0)
 
-# Presentation plot: Field of view with intersected tree crowns.
-file_name <- gsub('.JPG','_CrownsFOV.jpeg', photo_selection)
-file_path <- sprintf('results/%s', file_name)
-jpeg(filename=file_path)
-plot(background, axes=F)
-plot(crowns, col='darkgreen', add=T)
-plot(fov_polygon, add=T)
-plot(crowns_inter, col='green', add=T)
-plot(photo_origin, col='red', cex=1.5, add=T)
-dev.off()
+# GGplot
+plot_fortify <- fortify(crowns_result, region='id')
+plot_merge <- merge(plot_fortify, crowns_result@data, by='id')
 
-# Presentation plot: Visible cells of tree crowns.
-visible_buffer <- buffer(crowns_visible, width=1)
-file_name <- gsub('.JPG','_CrownsVis.jpeg', photo_selection)
-file_path <- sprintf('results/%s', file_name)
-jpeg(filename=file_path)
-plot(background, axes=T)
-plot(fov_polygon, add=T)
-plot(crowns_inter, col='green', add=T)
-plot(visible_buffer, col='darkorchid1', add=T)
-plot(photo_origin, col='red', cex=1.5, add=T)
-dev.off()
 
-spplot(crowns_result, zcol='Proportion')
-spplot(crowns_result, zcol='Proportion', add=T)
 
-spplot(background, col='white', main = "testing testing", sp.layout =
-         list(list(crowns, col='seashell'),
-              list('sp.polygons', crowns_inter, col="seashell2", lty=3, lwd=1), 
-              list('sp.polygons', crowns_result$Visible, col='green')))
-# plot(fov_polygon)
-# plot(crowns, col='green', add=T)
-# plot(photo_origin, col='red', add=T)
-# plot(crowns_inter, col='darkgreen', add=T)
-# plot(fov_polygon, add=T)
-# box()
-# mtext(side=3, paste("Trees in Field of View for Photograph: ", photo_origin$Name), cex=1.1, line=1, adj=0)
-# text(photo_origin@coords, labels=as.character('Camera position'), cex=1.1, font=2, pos=2, offset=0.8)
-# 
-# # Plot proportional visibility of tree crowns.
-# spplot(crowns_species, zcol='proportion', main=paste('Proportional Visibility of Tree Crowns for Photograph: ', photo_origin$Name))
-# spplot
-# # Export visible trees dataframe.
-# photo_name <- gsub(".JPG", '', photo_selection, fixed = TRUE)
-# path <- paste('results/', photo_name, '.txt')
-# path <- gsub(" ", '', path, fixed = TRUE)
-# write.table(vis_trees_df, path, sep="\t")
-# 
-# extent_fov <- extent(fov_polygon)
-# plot_extent <- extent(c(extent_fov[1]-30, extent_fov[2]+30, extent_fov[3]-30, extent_fov[4]+30))
-# plot_bg <- raster(plot_extent, vals=NA)
-# 
-# # # fov_polygon
-# # plot(plot_bg)
-# # plot(fov_polygon, add=T)
-# # plot(photo_origin, col='red', cex=2, add=T)
-# # 
-# # # intersect trees
-# # plot(plot_bg)
-# # plot(crowns, col='darkgreen', add=T)
-# # plot(crowns_inter, col='green', add=T)
-# # plot(fov_polygon, add=T)
-# # plot(photo_origin, col='red', cex=2, add=T)
-
-# visibility trees
-# crowns_visible[crowns_visible == 0] <-NA
-# plot(plot_bg)
-# plot(crowns_inter, col='green', add=T)
-# plot(fov_polygon, add=T)
-# plot(photo_origin, col='red', cex=2, add=T)
-# plot(crowns_visible, col='red', add=T)
-# 
-# # proportion
-# spplot(crowns_result, zcol='Visible')
-
-# # # crowns species
-# # plot(plot_bg)
-# # plot(crowns_inter, col='green', add=T)
-# # plot(fov_polygon, add=T)
-# # plot(photo_origin, col='red', cex=2, add=T)
-# # plot(species, col='red', add=T)
-# 
-# print(vis_trees_df)
