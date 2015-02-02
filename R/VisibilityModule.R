@@ -114,15 +114,16 @@ SumVisible <- function(polygon, visible, extent){
 }
 
 
-SpeciesVisible <- function(polygon, species){
+SpeciesVisible <- function(polygon, visible, species){
   #' Assigns species to visible tree crowns in field of view.
   #' @param polygon Tree crown spatial polygon.
+  #' @param visible A raster of values for visible cells.
   #' @param species Spatial points data frame of tree species.
   #' @return Character string of tree species for tree crown polygon.    
   # Intersect tree with species points.
   tree_int <- gIntersection(species, polygon)
   # If tree species found and visible, retrieve first tree species by matching coordinates with species data set.
-  if((length(tree_int) > 0) & (polygon$Visible > 0)){
+  if((length(tree_int) > 0) & (visible > 0)){
     tree_coords <- coordinates(tree_int)
     for(j in 1:length(species)){
       if((as.integer(species@coords[j, 1]) == as.integer(tree_coords[1,1])) & (as.integer(species@coords[j, 2]) == as.integer(tree_coords[1,2]))) 

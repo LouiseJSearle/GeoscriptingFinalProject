@@ -8,13 +8,15 @@ library('stringr')
 
 # Function definition.
 
-ExifData <- function(position){
+ExifData <- function(photo){
   #' Extracts the exif data for a photograph required for field of view analysis.
-  #' @param position The position of the photograph, in a list of files for directory of photographs.
+  #' @param photo Photograph to retrieve exif data from, stored in photographs directory.
   #' @return A data frame containing the exif data for the photograph.
-  # Retrieve exif data from photographs using ExifTool. 
+  # Retrieve exif data from photograph using ExifTool. 
   exif_data <- system('exiftool -T -r -filename -FocalLength -GPSLatitude -GPSLongitude -GPSImgDirection photographs', inter=TRUE)
   exif_data <- gsub('"','', exif_data)
+  list <- as.vector(list.files('photographs/'))
+  position <- match(photo, list)
   exif_position <- exif_data[position]
   # Extract relevant data from exif string with regular expression.
   exif_match <- str_match(exif_position, "(IMG_[0-9]+\\.JPG)\t([0-9]\\.[0-9]) mm\t([0-9][0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([SN])\t([0-9]) deg ([0-9][0-9])\\' ([0-9]+\\.[0-9][0-9]) ([EW])\t([0-9]+)")
