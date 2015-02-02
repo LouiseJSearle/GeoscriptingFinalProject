@@ -7,6 +7,7 @@
 library('raster')
 library('rgeos')
 library('rgdal')
+library('sp')
 
 # Function definition.
 
