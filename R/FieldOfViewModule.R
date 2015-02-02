@@ -61,7 +61,8 @@ PolygonFOV <- function(origin, points, project, view_min, view_max){
   #' @param view_max The maximum distance of features that the camera can observe.
   #' @return A spatial polygons data frame of the fov for the photograph.
   # Create triangular polygon from points.
-  coords_matrix = matrix(points[, c(2,4,6,3,5,7)], nrow=3, ncol=2, byrow=F)
+  coords_dbl <- as.double(points[, c(2,4,6,3,5,7)])
+  coords_matrix = matrix(coords_dbl, nrow=3, ncol=2, byrow=F)
   poly <- Polygon(coords_matrix)
   poly_list <- Polygons(list(poly),1)
   poly_sp <- SpatialPolygons(list(poly_list), proj4string=project)
