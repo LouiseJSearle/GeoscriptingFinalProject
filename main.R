@@ -26,6 +26,7 @@ lapply(c('downloader', 'raster', 'rgeos', 'sp', 'rgdal', 'ggplot2', 'ggmap'), li
 source('R/PhotographModule.R')
 source('R/FieldOfViewModule.R')
 source('R/VisibilityModule.R')
+source('R/VisualisationModule.R')
 
 
 # Step 2 # Set known variables ######################################################
@@ -47,7 +48,7 @@ url_species <- 'http://help.geodesk.nl/download_attachment.php?att_id=400&track=
 url_crowns <- 'http://help.geodesk.nl/download_attachment.php?att_id=393&track=JWH-4VP-G41D&e=louise.searle%40wur.nl'
 
 # Projection WGS.
-prj_WGS <- CRS("+proj=longlat +datum=WGS84")
+prj_WGS <- CRS("+init=epsg:4326")
 # Projection RD New.
 prj_RD <- CRS("+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.2369,50.0087,465.658,-0.406857330322398,0.350732676542563,-1.8703473836068,4.0812 +units=m +no_defs")
 
@@ -135,14 +136,26 @@ vis_trees_df <- data.frame('Species' = crowns_result$Species[crowns_result$Visib
 
 # Step 8 # Visualisation and results ################################################################
 
-# Define plot extent
-extent_fov <- extent(fov_polygon)
-plot_extent <- extent(c(extent_fov[1]-30, extent_fov[2]+30, extent_fov[3]-30, extent_fov[4]+30))
-background <- raster(plot_extent, vals=0)
+# Prepare datasets for ggplot.
+origin_wgs <- spTransform(photo_origin, prj_WGS)
+origin_plot<- data.frame(name=origin_wgs$Name, long=as.double(origin_wgs@coords[,1]), lat=as.double(origin_wgs@coords[,2]))
+fov_plot<- fortify(spTransform(fov_polygon, prj_WGS))
+crowns_plot<- fortify(spTransform(crowns, prj_WGS), region='VALUE')
+visible_plot<- fortify(spTransform(crowns_result, prj_WGS), region='id')
+visible_plot<- merge(visible_plot, crowns_result@data,  by='id')
 
-# GGplot
-plot_fortify <- fortify(crowns_result, region='id')
-plot_merge <- merge(plot_fortify, crowns_result@data, by='id')
+# Get extent.
+extent_fov <- extent(spTransform(fov_polygon, prj_WGS))
+
+# Plot datasets.
+ggplot()+
+  geom_polygon(data=crowns_plot, aes(x=long, y=lat), alpha=0.2)+
+  geom_path(data=fov_plot, aes(x=long, y=lat))+
+  geom_polygon(data=visible_plot, aes(x=long, y=lat, fill=Visible, group=group), alpha=0.8)+
+  geom_point(data=origin_plot, aes(x=long, y=lat))+
+  geom_rect(aes(xmin = extent_fov[1]-30, xmax = extent_fov[2]+30, ymin = extent_fov[3]-30, ymax = extent_fov[4]+30), 
+            fill = "transparent", size = 1.5)
 
 
 
+# origin_plot<- data.frame(name=origin_wgs$Name, long=as.double(origin_wgs@coords[,1]), lat=as.double(origin_wgs@coords[,2]))
