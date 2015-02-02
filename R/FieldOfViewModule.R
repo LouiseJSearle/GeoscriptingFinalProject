@@ -3,6 +3,13 @@
 
 ### Field of View Module
 
+# Import libraries.
+library('raster')
+library('rgeos')
+library('rgdal')
+
+# Function definition.
+
 PointsFOV <- function(photo, distance=150, angle=50){
   #' Determines the 3 points of a field of view (fov) polygon for a photograph.
   #' @param photo A point feature of the camera position with coordinates.

@@ -3,6 +3,11 @@
 
 ### Photograph Module
 
+# Import libraries.
+library('stringr')
+
+# Function definition.
+
 ExifData <- function(position){
   #' Extracts the exif data for a photograph required for field of view analysis.
   #' @param position The position of the photograph, in a list of files for directory of photographs.
