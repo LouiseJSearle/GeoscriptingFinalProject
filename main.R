@@ -173,9 +173,9 @@ ggplot()+
   geom_path(data=fov_plot, aes(long, lat), alpha=0.4)+
   # camera origin
   geom_point(data=origin_plot, aes(long, lat))+
-  geom_text(data=origin_plot, aes(long, lat, label=file_name), size=3, hjust=-0.1, vjust=0.2)+
+  geom_text(data=origin_plot, aes(long, lat, label=file_name), size=4, hjust=-0.1, vjust=0.2)+
   # species
-  geom_point(data=labels_plot[labels_plot$Species!='Not available',], aes(long, lat), alpha=0.3)+  
+  geom_point(data=labels_plot[labels_plot$Species!='Not available',], aes(long, lat), alpha=0.5, col='red', show_guide=F)+  
   geom_text(data=labels_plot[labels_plot$Species!='Not available',], aes(long, lat, label=Species), size=4, hjust=-0.1, vjust=0.2)+
   # title
   ggtitle(sprintf('Photograph %s Tree Species', file_name))
