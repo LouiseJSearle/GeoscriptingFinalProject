@@ -157,8 +157,8 @@ labels_plot <- data.frame(Species=crowns_result$Species, long=as.double(labels_p
 
 # Set result file path.
 file_name <- gsub('.JPG','', photo_selection)
-file_path <- sprintf('results/%s_result.jpeg', file_name)
-jpeg(filename=file_path)
+plot_path <- sprintf('results/%s_result.jpeg', file_name)
+jpeg(filename=plot_path)
 
 # Plot datasets and export plot.
 ggplot()+
@@ -173,11 +173,16 @@ ggplot()+
   geom_path(data=fov_plot, aes(long, lat), alpha=0.4)+
   # camera origin
   geom_point(data=origin_plot, aes(long, lat))+
-  # labels
-  geom_text(data=labels_plot, aes(long, lat, label=Species), size=4, hjust=0, vjust=0)+
-  geom_text(data=origin_plot, aes(long, lat, label=file_name), size=3, hjust=-0.1, vjust=0)+
+  geom_text(data=origin_plot, aes(long, lat, label=file_name), size=3, hjust=-0.1, vjust=0.2)+
+  # species
+  geom_point(data=labels_plot[labels_plot$Species!='Not available',], aes(long, lat), alpha=0.3)+  
+  geom_text(data=labels_plot[labels_plot$Species!='Not available',], aes(long, lat, label=Species), size=4, hjust=-0.1, vjust=0.2)+
+  # title
   ggtitle(sprintf('Photograph %s Tree Species', file_name))
 dev.off()
 
-# Script complete.
+# Export result to table.
+table_path <- sprintf('results/%s_result.txt', file_name)
+write.table(vis_trees_df, table_path, sep=",")
 
+# Script complete.

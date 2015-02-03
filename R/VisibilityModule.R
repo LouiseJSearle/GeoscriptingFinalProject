@@ -130,7 +130,7 @@ SpeciesVisible <- function(polygon, visible, species){
         tree_species <- as.character(species$Boomsoort[j])
     } 
   } else{
-    tree_species <- ''
+    tree_species <- 'Not available'
   }
   return(tree_species)
 }
