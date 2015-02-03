@@ -56,7 +56,7 @@ VisibilityFOV <- function(stack){
       sight_matrix = matrix(c(stack$originX[i], stack$originY[i], stack$targetX[i], stack$targetY[i]), nrow=2, ncol=2, byrow=T)
       sight_line <- Line(sight_matrix)
       sight_lines <- Lines(list(sight_line), ID = as.character(NA))
-      sight_linesSp <- SpatialLines(list(sight_lines), proj4string=prj_RD)
+      sight_linesSp <- SpatialLines(list(sight_lines))
       # Sum values from feature layer that intersect with line.
       sight_cells <- extract(stack$layer, sight_linesSp, method='simple', fun=sum, na.rm=T)
       # If sum of values is equal to 1, then cell is visible.
@@ -130,7 +130,7 @@ SpeciesVisible <- function(polygon, visible, species){
         tree_species <- as.character(species$Boomsoort[j])
     } 
   } else{
-    tree_species <- 'Not available'
+    tree_species <- ''
   }
   return(tree_species)
 }

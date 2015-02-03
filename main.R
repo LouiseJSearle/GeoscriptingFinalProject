@@ -32,7 +32,7 @@ source('R/VisualisationModule.R')
 # Step 2 # Set known variables ######################################################
 
 # Photograph to analyse.
-photo_selection <-'IMG_5090.JPG'
+photo_selection <-'IMG_5095.JPG'
 
 # Camera model CCD size.
 camera_ccd <- 4.54 # For iPhone 4s in this case.
@@ -138,7 +138,7 @@ vis_trees_df <- data.frame('Species' = crowns_result$Species[crowns_result$Visib
 
 # Create extent.
 extent_fov <- extent(fov_polygon)
-extent_mat<- matrix(c(extent_fov[1]-30, extent_fov[3]-30, extent_fov[1]-30, extent_fov[4]+30, extent_fov[2]+30, extent_fov[4]+30, extent_fov[2]+30, extent_fov[3]-30), nrow=4, ncol=2, byrow=T)
+extent_mat<- matrix(c(extent_fov[1]-40, extent_fov[3]-40, extent_fov[1]-40, extent_fov[4]+40, extent_fov[2]+40, extent_fov[4]+40, extent_fov[2]+40, extent_fov[3]-40), nrow=4, ncol=2, byrow=T)
 extent_poly <- Polygon(extent_mat)
 extent_polys <- Polygons(list(extent_poly), ID=NA)
 extent_spolys <- SpatialPolygons(list(extent_polys), proj4string=prj_RD)
@@ -153,8 +153,7 @@ crowns_plot <- fortify(crowns_int, region='id')
 visible_plot <- fortify(spTransform(crowns_result, prj_WGS), region='id')
 visible_plot <- merge(visible_plot, crowns_result@data,  by='id')
 labels_points <- gCentroid(spTransform(crowns_result, prj_WGS), byid=T, id=NULL)
-labels_plot <- data.frame(Species=labels_plot$Species[labels_plot$Species != 'Not available'], long=as.double(labels_points@coords[labels_plot$Species != 'Not available',1]), lat=as.double(labels_points@coords[labels_plot$Species != 'Not available',2]))
-labels_angle <- ifelse(photo_origin$Direction>180, photo_origin$Direction, photo_origin$Direction-180)
+labels_plot <- data.frame(Species=crowns_result$Species, long=as.double(labels_points@coords[,1]), lat=as.double(labels_points@coords[,2]))
 
 # Set result file path.
 file_name <- gsub('.JPG','', photo_selection)
@@ -175,7 +174,8 @@ ggplot()+
   # camera origin
   geom_point(data=origin_plot, aes(long, lat))+
   # labels
-  geom_text(data=labels_plot, aes(long, lat, label=Species), size=5, hjust=0, vjust=0, angle=labels_angle)+
+  geom_text(data=labels_plot, aes(long, lat, label=Species), size=4, hjust=0, vjust=0)+
+  geom_text(data=origin_plot, aes(long, lat, label=file_name), size=3, hjust=-0.1, vjust=0)+
   ggtitle(sprintf('Photograph %s Tree Species', file_name))
 dev.off()
 
