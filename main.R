@@ -179,3 +179,5 @@ ggplot()+
   ggtitle(sprintf('Photograph %s Tree Species', file_name))
 dev.off()
 
+# Script complete.
+
