@@ -136,26 +136,46 @@ vis_trees_df <- data.frame('Species' = crowns_result$Species[crowns_result$Visib
 
 # Step 8 # Visualisation and results ################################################################
 
+# Create extent.
+extent_fov <- extent(fov_polygon)
+extent_mat<- matrix(c(extent_fov[1]-30, extent_fov[3]-30, extent_fov[1]-30, extent_fov[4]+30, extent_fov[2]+30, extent_fov[4]+30, extent_fov[2]+30, extent_fov[3]-30), nrow=4, ncol=2, byrow=T)
+extent_poly <- Polygon(extent_mat)
+extent_polys <- Polygons(list(extent_poly), ID=NA)
+extent_spolys <- SpatialPolygons(list(extent_polys), proj4string=prj_RD)
+extent_plot <- spTransform(extent_spolys, prj_WGS)
+
 # Prepare datasets for ggplot.
 origin_wgs <- spTransform(photo_origin, prj_WGS)
-origin_plot<- data.frame(name=origin_wgs$Name, long=as.double(origin_wgs@coords[,1]), lat=as.double(origin_wgs@coords[,2]))
-fov_plot<- fortify(spTransform(fov_polygon, prj_WGS))
-crowns_plot<- fortify(spTransform(crowns, prj_WGS), region='VALUE')
-visible_plot<- fortify(spTransform(crowns_result, prj_WGS), region='id')
-visible_plot<- merge(visible_plot, crowns_result@data,  by='id')
+origin_plot <- data.frame(name=origin_wgs$Name, long=as.double(origin_wgs@coords[,1]), lat=as.double(origin_wgs@coords[,2]))
+fov_plot <- fortify(spTransform(fov_polygon, prj_WGS))
+crowns_int <- gIntersection(spTransform(crowns, prj_WGS), extent_plot, byid=T)
+crowns_plot <- fortify(crowns_int, region='id')
+visible_plot <- fortify(spTransform(crowns_result, prj_WGS), region='id')
+visible_plot <- merge(visible_plot, crowns_result@data,  by='id')
+labels_points <- gCentroid(spTransform(crowns_result, prj_WGS), byid=T, id=NULL)
+labels_plot <- data.frame(Species=labels_plot$Species[labels_plot$Species != 'Not available'], long=as.double(labels_points@coords[labels_plot$Species != 'Not available',1]), lat=as.double(labels_points@coords[labels_plot$Species != 'Not available',2]))
+labels_angle <- ifelse(photo_origin$Direction>180, photo_origin$Direction, photo_origin$Direction-180)
 
-# Get extent.
-extent_fov <- extent(spTransform(fov_polygon, prj_WGS))
+# Set result file path.
+file_name <- gsub('.JPG','', photo_selection)
+file_path <- sprintf('results/%s_result.jpeg', file_name)
+jpeg(filename=file_path)
 
-# Plot datasets.
+# Plot datasets and export plot.
 ggplot()+
-  geom_polygon(data=crowns_plot, aes(x=long, y=lat), alpha=0.2)+
-  geom_path(data=fov_plot, aes(x=long, y=lat))+
-  geom_polygon(data=visible_plot, aes(x=long, y=lat, fill=Visible, group=group), alpha=0.8)+
-  geom_point(data=origin_plot, aes(x=long, y=lat))+
-  geom_rect(aes(xmin = extent_fov[1]-30, xmax = extent_fov[2]+30, ymin = extent_fov[3]-30, ymax = extent_fov[4]+30), 
-            fill = "transparent", size = 1.5)
+  coord_fixed(ratio=1.5)+
+  # campus crowns
+  geom_path(data=crowns_plot, aes(long, lat, group=group), color='white')+
+  # visible tree crowns
+  geom_polygon(data=visible_plot, aes(long, lat, fill=Proportion, group=group), alpha=0.8)+
+  scale_fill_gradient(low='lightgoldenrod1', high='indianred1')+
+  geom_path(data=visible_plot, aes(long, lat, group=group), color='white')+ 
+  # field of view
+  geom_path(data=fov_plot, aes(long, lat), alpha=0.4)+
+  # camera origin
+  geom_point(data=origin_plot, aes(long, lat))+
+  # labels
+  geom_text(data=labels_plot, aes(long, lat, label=Species), size=5, hjust=0, vjust=0, angle=labels_angle)+
+  ggtitle(sprintf('Photograph %s Tree Species', file_name))
+dev.off()
 
-
-
-# origin_plot<- data.frame(name=origin_wgs$Name, long=as.double(origin_wgs@coords[,1]), lat=as.double(origin_wgs@coords[,2]))
